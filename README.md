@@ -84,7 +84,7 @@ To incorporate **iRacingTelemetrySDK** into your projects, follow these steps:
 
 ## Samples
 
-See [./Samples/README.md](Samples/README.md) for a list of example projects using the SDK
+See [./Samples/README.md](https://github.com/SVappsLAB/iRacingTelemetrySDK/tree/main/Samples/README.md) for a list of example projects using the SDK
 
 ## Event Sequence Diagram
 
@@ -127,4 +127,4 @@ sequenceDiagram
 
 ## License
 
-This project is licensed under the Apache License. Refer to the [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache License. Refer to the [LICENSE](https://github.com/SVappsLAB/iRacingTelemetrySDK/blob/main/LICENSE) file for details.
