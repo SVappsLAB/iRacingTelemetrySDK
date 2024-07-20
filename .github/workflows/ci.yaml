@@ -4,7 +4,7 @@ on:
 
 jobs:
   buildAndTest:
-   runs-on: windows-latest
+   runs-on: ubuntu-latest
    steps:
     - uses: actions/checkout@v2
 
@@ -18,7 +18,9 @@ jobs:
     - name: build
       run: dotnet build --no-restore -c release
     - name: unit tests
-      run: dotnet test --no-restore -c release --filter tests/UnitTests
-    - name: ibt tests
-      run: dotnet test --no-restore -c release --filter tests/IBT_Tests
+      run: dotnet test --no-restore -c release --filter UnitTests
+    # can't run IBT tests with github runers - because we don't have
+    # access to memory mapped files on the host
+    # - name: ibt tests
+    #   run: dotnet test --no-restore -c release --filter IBT_Tests
   
