@@ -1,0 +1,85 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.10.35027.167
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SVappsLAB.iRacingTelemetrySDK", "SVappsLAB.iRacingTelemetrySDK\SVappsLAB.iRacingTelemetrySDK.csproj", "{30E3D703-1A4D-46A3-BD8E-60C6F618851C}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SVappsLAB.iRacingTelemetrySDK.CodeGen", "SVappsLAB.iRacingTelemetrySDK.CodeGen\SVappsLAB.iRacingTelemetrySDK.CodeGen.csproj", "{43B734CD-214D-4F91-8083-5B199933B602}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{B72EA0DF-4C9E-46DA-B581-3E5A456E711C}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UnitTests", "tests\UnitTests\UnitTests.csproj", "{21625842-A56A-4F10-8F12-E6E27C5A167B}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IBT_Tests", "tests\IBT_Tests\IBT_Tests.csproj", "{C15621B4-C2E5-4A3C-A36F-F252E823EA72}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Live_Tests", "tests\Live_Tests\Live_Tests.csproj", "{42A7E161-8B51-4D06-9FEF-2430A6E27567}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Samples", "Samples", "{C9AEF22A-43D3-47DE-9074-0849EFB3D217}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DumpVariables_DumpSessionInfo", "Samples\DumpVariables_DumpSessionInfo\DumpVariables_DumpSessionInfo.csproj", "{A20D6887-ABDC-4B33-A482-F5CF9E7FB47B}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "data", "data", "{3A00C141-3FA6-415C-A4CE-BAE08F1E217F}"
+	ProjectSection(SolutionItems) = preProject
+		Samples\data\formulair04_tsukuba 2kfull 2024-01-09 17-26-10.ibt = Samples\data\formulair04_tsukuba 2kfull 2024-01-09 17-26-10.ibt
+	EndProjectSection
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LocationAndWarnings", "Samples\LocationAndWarnings\LocationAndWarnings.csproj", "{B264F7CE-0F78-4AC1-9728-CAE3E063291F}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SpeedRPMGear", "Samples\SpeedRPMGear\SpeedRPMGear.csproj", "{C95FE96C-7549-4AF7-8939-F9E37B79E35A}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{30E3D703-1A4D-46A3-BD8E-60C6F618851C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{30E3D703-1A4D-46A3-BD8E-60C6F618851C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{30E3D703-1A4D-46A3-BD8E-60C6F618851C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{30E3D703-1A4D-46A3-BD8E-60C6F618851C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{43B734CD-214D-4F91-8083-5B199933B602}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{43B734CD-214D-4F91-8083-5B199933B602}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{43B734CD-214D-4F91-8083-5B199933B602}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{43B734CD-214D-4F91-8083-5B199933B602}.Release|Any CPU.Build.0 = Release|Any CPU
+		{21625842-A56A-4F10-8F12-E6E27C5A167B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{21625842-A56A-4F10-8F12-E6E27C5A167B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{21625842-A56A-4F10-8F12-E6E27C5A167B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{21625842-A56A-4F10-8F12-E6E27C5A167B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C15621B4-C2E5-4A3C-A36F-F252E823EA72}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C15621B4-C2E5-4A3C-A36F-F252E823EA72}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C15621B4-C2E5-4A3C-A36F-F252E823EA72}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C15621B4-C2E5-4A3C-A36F-F252E823EA72}.Release|Any CPU.Build.0 = Release|Any CPU
+		{42A7E161-8B51-4D06-9FEF-2430A6E27567}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{42A7E161-8B51-4D06-9FEF-2430A6E27567}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{42A7E161-8B51-4D06-9FEF-2430A6E27567}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{42A7E161-8B51-4D06-9FEF-2430A6E27567}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A20D6887-ABDC-4B33-A482-F5CF9E7FB47B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A20D6887-ABDC-4B33-A482-F5CF9E7FB47B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A20D6887-ABDC-4B33-A482-F5CF9E7FB47B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A20D6887-ABDC-4B33-A482-F5CF9E7FB47B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B264F7CE-0F78-4AC1-9728-CAE3E063291F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B264F7CE-0F78-4AC1-9728-CAE3E063291F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B264F7CE-0F78-4AC1-9728-CAE3E063291F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B264F7CE-0F78-4AC1-9728-CAE3E063291F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C95FE96C-7549-4AF7-8939-F9E37B79E35A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C95FE96C-7549-4AF7-8939-F9E37B79E35A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C95FE96C-7549-4AF7-8939-F9E37B79E35A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C95FE96C-7549-4AF7-8939-F9E37B79E35A}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{21625842-A56A-4F10-8F12-E6E27C5A167B} = {B72EA0DF-4C9E-46DA-B581-3E5A456E711C}
+		{C15621B4-C2E5-4A3C-A36F-F252E823EA72} = {B72EA0DF-4C9E-46DA-B581-3E5A456E711C}
+		{42A7E161-8B51-4D06-9FEF-2430A6E27567} = {B72EA0DF-4C9E-46DA-B581-3E5A456E711C}
+		{A20D6887-ABDC-4B33-A482-F5CF9E7FB47B} = {C9AEF22A-43D3-47DE-9074-0849EFB3D217}
+		{3A00C141-3FA6-415C-A4CE-BAE08F1E217F} = {C9AEF22A-43D3-47DE-9074-0849EFB3D217}
+		{B264F7CE-0F78-4AC1-9728-CAE3E063291F} = {C9AEF22A-43D3-47DE-9074-0849EFB3D217}
+		{C95FE96C-7549-4AF7-8939-F9E37B79E35A} = {C9AEF22A-43D3-47DE-9074-0849EFB3D217}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {A774B726-6C97-4ECE-AB77-C788463CA995}
+	EndGlobalSection
+EndGlobal
