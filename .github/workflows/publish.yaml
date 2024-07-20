@@ -1,0 +1,24 @@
+name: publish to nuget
+on:
+  release:
+    types: [released]
+
+jobs:
+  publish:
+   runs-on: ubuntu-latest
+   steps:
+    - uses: actions/checkout@v2
+
+    - name: setup
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+
+    - name: restore dependencies
+      run: dotnet restore
+    - name: build
+      run: dotnet build --no-restore -c release
+    - name: pack
+      run: dotnet pack --no-restore -c release -o ./artifacts SVappsLAB.iRacingTelemetrySDK
+    - name: publishPackage
+      run: dotnet nuget push ./artifacts/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json  
