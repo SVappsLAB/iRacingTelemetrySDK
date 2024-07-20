@@ -3,7 +3,7 @@ on:
   push:
 
 jobs:
-  publish:
+  buildAndTest:
    runs-on: ubuntu-latest
    steps:
     - uses: actions/checkout@v2
@@ -18,7 +18,7 @@ jobs:
     - name: build
       run: dotnet build --no-restore -c release
     - name: unit tests
-      run: dotnet test --no-restore -c release --filter UnitTests
+      run: dotnet test --no-restore -c release --filter tests/UnitTests
     - name: ibt tests
-      run: dotnet test --no-restore -c release --filter IBT_Tests
+      run: dotnet test --no-restore -c release --filter tests/IBT_Tests
   
