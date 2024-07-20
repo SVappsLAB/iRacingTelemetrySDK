@@ -1,0 +1,24 @@
+name: buildAndtest
+on:
+  push:
+
+jobs:
+  publish:
+   runs-on: ubuntu-latest
+   steps:
+    - uses: actions/checkout@v2
+
+    - name: setup
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+
+    - name: restore dependencies
+      run: dotnet restore
+    - name: build
+      run: dotnet build --no-restore -c release
+    - name: unit tests
+      run: dotnet test --no-restore -c release --filter UnitTests
+    - name: ibt tests
+      run: dotnet test --no-restore -c release --filter IBT_Tests
+  
