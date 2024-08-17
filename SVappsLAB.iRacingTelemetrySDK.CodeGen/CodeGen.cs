@@ -14,13 +14,13 @@
  * limitations under the License.using Microsoft.CodeAnalysis;
 **/
 
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Text;
 using System;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Text;
 
 namespace SVappsLAB.iRacingTelemetrySDK
 {
@@ -38,7 +38,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
             namespace SVappsLAB.iRacingTelemetrySDK
             {
                 [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
-                public sealed class RequiredTelemetryVarsAttribute : Attribute
+                internal sealed class RequiredTelemetryVarsAttribute : Attribute
                 {
                     private readonly string[]? _vars;
 

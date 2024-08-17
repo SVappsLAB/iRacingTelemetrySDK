@@ -44,19 +44,19 @@ Drivers:
     TeamName: @ALL
 ";
 
-        public static TheoryData<string, string, Type, int> Data =>
-    new TheoryData<string, string, Type, int>
+        public static TheoryData<string, Type, int> Data =>
+    new TheoryData<string, Type, int>
         {
-        { "yaml_no_issues", yaml_with_no_issues, typeof(object), 1 },
-        { "yaml_with_1_issues", unescapedYaml_with_1_issues, typeof(object), 2 },
-        { "yaml_with_5_issues", unescapedYaml_with_5_issues, typeof(object), 5 },
-        { "valid_yaml", File.ReadAllText(@"data/valid.yaml"), typeof(TelemetrySessionInfo), 1 },
-        { "invalid_unescapedChars", File.ReadAllText(@"data/invalid-unescapedChars.yaml"), typeof(TelemetrySessionInfo), 6 }
+        {  yaml_with_no_issues, typeof(object), 1 },
+        {  unescapedYaml_with_1_issues, typeof(object), 2 },
+        {  unescapedYaml_with_5_issues, typeof(object), 5 },
+        {  File.ReadAllText(@"data/valid.yaml"), typeof(TelemetrySessionInfo), 1 },
+        {  File.ReadAllText(@"data/invalid-unescapedChars.yaml"), typeof(TelemetrySessionInfo), 6 }
         };
 
         [Theory]
         [MemberData(nameof(Data))]
-        public void ParseYaml(string testName, string yaml, Type modelType, int parseAttempts)
+        public void ParseYaml(string yaml, Type modelType, int parseAttempts)
         {
             var parser = new YamlParser();
 
