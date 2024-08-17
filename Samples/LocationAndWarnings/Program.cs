@@ -75,7 +75,9 @@ namespace LocationAndWarnings
                     // check if the flag is set
                     if (engineWarnings.HasFlag(flag))
                     {
-                        warnings.Add(Enum.GetName(typeof(irsdk_EngineWarnings), flag));
+                        var flagName = Enum.GetName(typeof(irsdk_EngineWarnings), flag);
+                        if (!string.IsNullOrEmpty(flagName))
+                            warnings.Add(flagName);
                     }
                 }
                 return string.Join(",", warnings);
