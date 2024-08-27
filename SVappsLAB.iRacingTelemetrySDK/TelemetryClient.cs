@@ -14,9 +14,6 @@
  * limitations under the License.using Microsoft.CodeAnalysis;
 **/
 
-using Microsoft.Extensions.Logging;
-using SVappsLAB.iRacingTelemetrySDK.irSDKDefines;
-using SVappsLAB.iRacingTelemetrySDK.Models;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -25,6 +22,10 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using SVappsLAB.iRacingTelemetrySDK.IBTPlayback;
+using SVappsLAB.iRacingTelemetrySDK.irSDKDefines;
+using SVappsLAB.iRacingTelemetrySDK.Models;
 
 namespace SVappsLAB.iRacingTelemetrySDK
 {
@@ -64,6 +65,34 @@ namespace SVappsLAB.iRacingTelemetrySDK
         // unit.  something like "kg/m^2"
         public string Units { get; init; } = default!;
     }
+    /**
+     * Options for IBT file processing.
+     *
+     * @param ibtFilePath The file path of the IBT file.
+     * @param playBackSpeedMultiplier The playback speed multiplier for the IBT file.
+     * A value of 1 is 1x speed, a value of 10 is 10x speed. a value of int.MaxValue is as fast as possible
+     */
+    public record class IBTOptions
+    {
+        public string IbtFilePath
+        {
+            get; init;
+        }
+        public int PlayBackSpeedMultiplier { get; init; }
+
+        public IBTOptions(string ibtFilePath, int playBackSpeedMultiplier = int.MaxValue)
+        {
+            IbtFilePath = ibtFilePath;
+            if (playBackSpeedMultiplier <= 0)
+            {
+                throw new ArgumentOutOfRangeException("Playback speed must be greater than 0");
+            }
+
+            PlayBackSpeedMultiplier = playBackSpeedMultiplier;
+        }
+    }
+
+
 
     public class TelemetryClient<T> : ITelemetryClient<T> where T : struct
     {
@@ -85,7 +114,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
         bool _isInitialized = false;
 
         int _currentRecord = 0;
-        string? _ibtFilePath;
+        IBTOptions? _ibtOptions;
         string? _rawSessionInfoYaml;
 
         irSDKMemoryAccessProvider _irSDKMemoryProvider;
@@ -93,20 +122,20 @@ namespace SVappsLAB.iRacingTelemetrySDK
         private IEnumerable<System.Reflection.ParameterInfo> _telemetryDataConstructorParameters;
 
         // factory to create instances of the client
-        public static ITelemetryClient<T> Create(ILogger logger, string? ibtFilePath = null)
+        public static ITelemetryClient<T> Create(ILogger logger, IBTOptions? ibtOptions = null)
         {
-            return new TelemetryClient<T>(logger, ibtFilePath);
+            return new TelemetryClient<T>(logger, ibtOptions);
         }
-        private TelemetryClient(ILogger logger, string? ibtFilePath = null)
+        private TelemetryClient(ILogger logger, IBTOptions? ibtOptions = null)
         {
             // do a quick check for valid ibt file and bail immediately if not found
-            if (!String.IsNullOrEmpty(ibtFilePath) && !File.Exists(ibtFilePath))
+            if (ibtOptions != null && !File.Exists(ibtOptions.IbtFilePath))
             {
-                throw new FileNotFoundException($"IBT file [{ibtFilePath}] not found", ibtFilePath);
+                throw new FileNotFoundException($"IBT file [{ibtOptions.IbtFilePath}] not found", ibtOptions.IbtFilePath);
             }
 
             _logger = logger;
-            _ibtFilePath = ibtFilePath;
+            _ibtOptions = ibtOptions;
 
             _irSDKMemoryProvider = new irSDKMemoryAccessProvider(_logger);
 
@@ -213,7 +242,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
         {
             Dispose(false);
         }
-        private bool IsOnlineMode => _ibtFilePath == null;
+        private bool IsOnlineMode => _ibtOptions == null;
         private void UpdateSession()
         {
             var sw = new Stopwatch();
@@ -341,15 +370,17 @@ namespace SVappsLAB.iRacingTelemetrySDK
             var telemetryData = (T)_telemetryDataConstructorInfo.Invoke(parameterValues.ToArray());
             return telemetryData;
         }
-        private int ProcessIbtData(CancellationToken token)
+        private async Task<int> ProcessIbtData(CancellationToken token)
         {
             int numRecords = 0;
+            IPlaybackGovernor governor;
+
             try
             {
                 var sw = new Stopwatch();
                 sw.Start();
 
-                _irSDKMemoryProvider.OpenDataSource(_ibtFilePath!);
+                _irSDKMemoryProvider.OpenDataSource(_ibtOptions!.IbtFilePath);
 
                 numRecords = _irSDKMemoryProvider.GetNumRecordsInIBTFile();
 
@@ -363,6 +394,9 @@ namespace SVappsLAB.iRacingTelemetrySDK
                         UpdateSession();
                 }
 
+                governor = new SimpleGovernor(_logger, _ibtOptions!.PlayBackSpeedMultiplier);
+                governor.StartPlayback();
+
                 // loop until we are at eof or cancelled
                 for (_currentRecord = 0; _currentRecord < numRecords && !token.IsCancellationRequested; _currentRecord++)
                 {
@@ -374,6 +408,9 @@ namespace SVappsLAB.iRacingTelemetrySDK
                         var telemetryData = GetTelemetryDataSample();
                         OnTelemetryUpdate.Invoke(this, telemetryData);
                     }
+
+                    // throttle playback speed
+                    await governor.GovernSpeed(_currentRecord);
                 }
 
                 sw.Stop();
@@ -397,4 +434,3 @@ namespace SVappsLAB.iRacingTelemetrySDK
 
     }
 }
-

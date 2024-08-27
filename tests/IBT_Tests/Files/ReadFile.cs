@@ -27,10 +27,9 @@ namespace IBT_Tests.Files
         [Fact]
         public async Task ValidFileSucceeds()
         {
-
             var ibtFile = @"../../../data/race_test/lamborghinievogt3_spa up.ibt";
 
-            using var tc = TelemetryClient<TelemetryData>.Create(NullLogger.Instance, ibtFile);
+            using var tc = TelemetryClient<TelemetryData>.Create(NullLogger.Instance, new IBTOptions(ibtFile, int.MaxValue));
 
             var gotConnected = false;
             EventHandler<ConnectStateChangedEventArgs> handler = (_sender, e) =>
@@ -54,7 +53,7 @@ namespace IBT_Tests.Files
             Assert.Throws<FileNotFoundException>(() =>
             {
                 var ibtFile = @"no-such-file-name";
-                using var tc = TelemetryClient<TelemetryData>.Create(NullLogger.Instance, ibtFile);
+                using var tc = TelemetryClient<TelemetryData>.Create(NullLogger.Instance, new IBTOptions(ibtFile));
             });
         }
     }

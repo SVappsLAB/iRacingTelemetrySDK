@@ -45,17 +45,24 @@ To incorporate **iRacingTelemetrySDK** into your projects, follow these steps:
     ```
 1. Create an instance of the TelemetryClient
 
-    The logger is required, but the IBT file is optional.
+    The TelemetryClient runs in one of two modes: Live or IBT file playback.
 
-    ```csharp
-    ILogger logger;
-    string ibtFile;
+	For live telemetry, you only need to provide a logger.
 
-    using var tc = TelemetryClient<TelemetryData>.Create(logger, ibtFile);
-    ```
+	```csharp
+	// live telemetry
+	using var tc = TelemetryClient<TelemetryData>.Create(logger);
+	```
 
-    If the IBT file is provided, telemetry data will be read from the file.<br/>
-    If no IBT file is provided, the SDK will connect to the running instance of IRacing.
+    For IBT playback, provide the path to the IBT file and an optional playback speed multiplier.  The speed multiplier will speed up or slow down the playback of the IBT file.<br/>
+    A speed of `1` will play the IBT file at the normal speed iRacing output the file (60 records/sec).  A speed of `20` will playback the file at 20x speed (20*60=1200 records/rec).<br/>
+    To play the file at maximum speed, use `int.MaxValue` as the multiplier value.
+
+	```csharp
+	// process the IBT file at 10x speed
+    var ibtOptions = new IBTOptions(@"C:\path\to\file.ibt", 10);
+	using var tc = TelemetryClient<TelemetryData>.Create(logger, ibtOptions);
+	```
 
 1. Add an event handler
 

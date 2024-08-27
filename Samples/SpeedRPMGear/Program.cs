@@ -34,7 +34,7 @@ namespace SpeedRPMGear
                     .CreateLogger("logger");
 
             // create telemetry client 
-            using var tc = TelemetryClient<TelemetryData>.Create(logger, ibtFile);
+            using var tc = TelemetryClient<TelemetryData>.Create(logger, new IBTOptions(ibtFile));
 
             // subscribe to telemetry updates
             tc.OnTelemetryUpdate += OnTelemetryUpdate;

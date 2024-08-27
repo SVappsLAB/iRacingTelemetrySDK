@@ -37,7 +37,7 @@ namespace IBT_Tests
         {
             var tcs = new TaskCompletionSource<bool>();
 
-            TelemetryClient = TelemetryClient<TelemetryData>.Create(NullLogger.Instance, _ibtPath);
+            TelemetryClient = TelemetryClient<TelemetryData>.Create(NullLogger.Instance, new IBTOptions(_ibtPath));
             TelemetryClient.OnSessionInfoUpdate += (object? sender, TelemetrySessionInfo si) =>
             {
                 TelemetrySessionInfo = si;

@@ -39,7 +39,7 @@ namespace LocationAndWarnings
             logger.LogInformation("processing data from \"{source}\"", String.IsNullOrEmpty(ibtFile) ? "online LIVE session" : "offline IBT file");
 
             // create telemetry client 
-            using var tc = TelemetryClient<TelemetryData>.Create(logger, ibtFile);
+            using var tc = TelemetryClient<TelemetryData>.Create(logger, new IBTOptions(ibtFile));
 
             // subscribe to telemetry updates
             tc.OnTelemetryUpdate += OnTelemetryUpdate;
