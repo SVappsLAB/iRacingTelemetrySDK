@@ -36,16 +36,17 @@ namespace DumpVariables_DumpSessionInfo
             CancellationTokenSource cts = new CancellationTokenSource();
 
             // if you pass in a IBT filename, we'll use that, otherwise default to LIVE mode
-            var ibtFile = args.Length == 1 ? args[0] : null;
+            var ibtOptions = args.Length == 1 ? new IBTOptions(args[0]) : null;
+
             var logger = LoggerFactory
                     .Create(builder => builder
                     .AddConsole().AddSimpleConsole(o => o.SingleLine = true))
                     .CreateLogger("logger");
 
-            logger.LogInformation("pulling data from \'{source}\'", String.IsNullOrEmpty(ibtFile) ? "Live iRacing session" : "IBT file session");
+            logger.LogInformation("pulling data from \'{source}\'", ibtOptions != null ? "IBT file session" : "Live iRacing session");
 
             // create telemetry client  and subscribe
-            using var tc = TelemetryClient<TelemetryData>.Create(logger, ibtFile);
+            using var tc = TelemetryClient<TelemetryData>.Create(logger, ibtOptions);
             tc.OnConnectStateChanged += OnConnectStateChanged;
             tc.OnSessionInfoUpdate += OnSessionInfoUpdate;
 
