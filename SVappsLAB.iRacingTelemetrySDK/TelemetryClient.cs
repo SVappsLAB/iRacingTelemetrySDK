@@ -298,6 +298,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
                 catch (Exception e)
                 {
                     _logger.LogError(e, "error processing live data");
+                    OnError?.Invoke(this, new ExceptionEventArgs(e));
                     throw;
                 }
             }
@@ -422,6 +423,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
             {
                 _logger.LogError(e, "error playing ibt file");
                 OnError?.Invoke(this, new ExceptionEventArgs(e));
+                throw;
             }
             finally
             {

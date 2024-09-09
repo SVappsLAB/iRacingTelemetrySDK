@@ -29,7 +29,7 @@
 		<PackageTags>iRacing iRacingSDK irsdk IBT Telemetry SDK API</PackageTags>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PackageLicenseFile>LICENSE</PackageLicenseFile>
-		<Version>0.6.0</Version>
+		<Version>0.6.1</Version>
 		<Authors>Scott Velez</Authors>
 		<Company>SVappsLAB</Company>
 		<Copyright>Copyright (c) 2024 SVappsLAB</Copyright>
