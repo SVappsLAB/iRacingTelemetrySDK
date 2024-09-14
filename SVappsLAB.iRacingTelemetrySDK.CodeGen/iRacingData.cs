@@ -14,6 +14,12 @@
  * limitations under the License.using Microsoft.CodeAnalysis;
 **/
 
+/* 
+ * This file is used by the code generation tooling to generate the TelemetryData structure with strongly typed properties.
+ * It is NOT meant to be used directly.
+ * 
+**/
+
 using System;
 using System.Collections.Generic;
 
@@ -22,7 +28,8 @@ namespace SVappsLAB.iRacingTelemetrySDK
     public record struct VarItem(string Name, int Type, int Length, bool IsTimeValue, string Desc, string Units);
     public class iRacingData
     {
-        // all knowns vars from the iRacing SDK - live and ibt
+        // a dictionary of all known variables from the iRacing SDK - both live sessions and offline ibt files
+        // this data is used by the code generation to generate typed variables for your code.
         public Dictionary<string, VarItem> Vars = new(StringComparer.OrdinalIgnoreCase)
         {
             { "AirDensity", new VarItem("AirDensity", 4, 1, false, "Density of air at start/finish line", "kg/m^3") },

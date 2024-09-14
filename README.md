@@ -14,6 +14,18 @@ When processing IBT files for example, the SDK is able to process 1 hour of save
 
 - **Strongly Typed Telemetry Data**: Source Generation is used to create a strongly typed `TelemetryData` struct, with the iRacing variables you choose.
 
+## Telemetry Variables
+
+The iRacing simulator produces extensive telemetry data. This SDK allows you to select the variables to track in your program and generates a strongly-typed `TelemetryData` struct with those variables.
+
+### Availability
+
+iRacing outputs different variables depending on the context. Some variables available in live sessions might not be available in offline IBT files, and vice versa.
+
+To check variable availability, use the [./Samples/DumpVariables_DumpSessionInfo](https://github.com/SVappsLAB/iRacingTelemetrySDK/tree/main/Samples/DumpVariables_DumpSessionInfo) utility. This will generate a CSV file listing available variables and a YAML file with complete session info.
+
+Once you know what variables are available and you have the list of which ones you want to use, you're ready to start using the SDK.
+
 ## Getting Started
 
 To incorporate **iRacingTelemetrySDK** into your projects, follow these steps:
