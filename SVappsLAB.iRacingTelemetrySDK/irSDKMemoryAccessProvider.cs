@@ -14,8 +14,6 @@
  * limitations under the License.using Microsoft.CodeAnalysis;
 **/
 
-using Microsoft.Extensions.Logging;
-using SVappsLAB.iRacingTelemetrySDK.irSDKDefines;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -23,6 +21,8 @@ using System.IO.MemoryMappedFiles;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
+using Microsoft.Extensions.Logging;
+using SVappsLAB.iRacingTelemetrySDK.irSDKDefines;
 
 namespace SVappsLAB.iRacingTelemetrySDK
 {
@@ -134,7 +134,29 @@ namespace SVappsLAB.iRacingTelemetrySDK
         }
         public string GetSessionInfoYaml()
         {
-            var sessInfo = Marshal.PtrToStringAnsi(new IntPtr(_dataPtr + _header.sessionInfoOffset), _header.sessionInfoLen);
+            var header = GetHeader();
+            var offSet = header.sessionInfoOffset;
+
+            // this is the maximum length
+            var len = header.sessionInfoLen;
+
+            // but the actual length may be shorter, so we need
+            // to scan and find the null terminator, if there is one
+            Span<byte> span = new Span<byte>(_dataPtr + offSet, len);
+            for (int i = 0; i < span.Length; i++)
+            {
+                if (span[i] == 0)
+                {
+                    _logger.LogDebug("SessionInfo: length is {len}, but found null terminator at {i}", len, i);
+
+                    // adjust length
+                    len = i;
+                    break;
+                }
+            }
+
+            // convert buffer (from 'offSet' to 'len') to a string
+            var sessInfo = Marshal.PtrToStringAnsi(new IntPtr(_dataPtr + GetHeader().sessionInfoOffset), len);
             return sessInfo;
         }
         public int GetNumRecordsInIBTFile()
