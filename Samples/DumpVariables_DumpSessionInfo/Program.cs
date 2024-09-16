@@ -40,7 +40,7 @@ namespace DumpVariables_DumpSessionInfo
 
             var logger = LoggerFactory
                     .Create(builder => builder
-                    .AddConsole().AddSimpleConsole(o => o.SingleLine = true))
+                    .AddConsole().AddSimpleConsole(o => o.SingleLine = true).SetMinimumLevel(LogLevel.Debug))
                     .CreateLogger("logger");
 
             logger.LogInformation("pulling data from \'{source}\'", ibtOptions != null ? "IBT file session" : "Live iRacing session");
@@ -105,7 +105,7 @@ namespace DumpVariables_DumpSessionInfo
                 variables = variables.OrderBy(v => v.Name);
 
                 // open telemetryVariables file and write
-                using (var writer = new StreamWriter(VARIABLES_FILENAME))
+                using (var writer = new StreamWriter(VARIABLES_FILENAME, false, System.Text.Encoding.UTF8))
                 {
                     // header
                     writer.WriteLine("name, desc, units, type, length, isTimeValue");
@@ -122,9 +122,9 @@ namespace DumpVariables_DumpSessionInfo
             void writeSessionInfoFile(string sessionInfoYaml)
             {
                 // open sessionInfo file and write
-                using (var writer = new StreamWriter(SESSIONINFO_FILENAME))
+                using (var writer = new StreamWriter(SESSIONINFO_FILENAME, false, System.Text.Encoding.UTF8))
                 {
-                    writer.WriteLine(sessionInfoYaml);
+                    writer.Write(sessionInfoYaml);
                 }
                 logger.LogInformation("raw sessionInfo yml saved to \"{filename}\"", SESSIONINFO_FILENAME);
             }

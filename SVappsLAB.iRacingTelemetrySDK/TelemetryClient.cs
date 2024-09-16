@@ -243,7 +243,19 @@ namespace SVappsLAB.iRacingTelemetrySDK
             Dispose(false);
         }
         private bool IsOnlineMode => _ibtOptions == null;
-        private void UpdateSession()
+
+        Task UpdateSession()
+        {
+            var task = Task.Run(() =>
+                {
+                    _logger.LogDebug("UpdateSession - starting async processing");
+                    UpdateSessionHelper();
+                    _logger.LogDebug("UpdateSession - completed async processing");
+                }
+            );
+            return task;
+        }
+        void UpdateSessionHelper()
         {
             var sw = new Stopwatch();
             sw.Start();
@@ -258,6 +270,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
 
                 // send event
                 OnSessionInfoUpdate?.Invoke(this, sessionTelemetryInfo);
+                _logger.LogDebug("sessionInfo event sent");
             }
             catch (Exception e)
             {
@@ -306,6 +319,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
             return -1;
         }
 
+        Task _sessionInfoProcessingTask = Task.CompletedTask;
         private async Task WaitForData(CancellationToken ct)
         {
             // ensure initialization
@@ -340,7 +354,15 @@ namespace SVappsLAB.iRacingTelemetrySDK
             if (_irSDKMemoryProvider.IsSessionInfoUpdated())
             {
                 if (OnSessionInfoUpdate != null)
-                    UpdateSession();
+                {
+                    // if the previous task is still processing (should never happen)
+                    // log the issue, but don't block
+                    if (!_sessionInfoProcessingTask.IsCompleted)
+                    {
+                        _logger.LogWarning("sessionInfo processing task is still running");
+                    }
+                    _sessionInfoProcessingTask = UpdateSession();
+                }
             }
 
             // wait for new telemetry data
@@ -392,7 +414,11 @@ namespace SVappsLAB.iRacingTelemetrySDK
                 if (_irSDKMemoryProvider.IsSessionInfoUpdated())
                 {
                     if (OnSessionInfoUpdate != null)
-                        UpdateSession();
+                    {
+                        // for ibt processsing, we do not have any timing loop constraints,
+                        // so we can wait for the session info to be processed before continuing
+                        await UpdateSession();
+                    }
                 }
 
                 governor = new SimpleGovernor(_logger, _ibtOptions!.PlayBackSpeedMultiplier);

@@ -30,7 +30,9 @@ namespace SpeedRPMGear
             var counter = 0;
             var logger = LoggerFactory
                     .Create(builder => builder
-                    .AddConsole().AddSimpleConsole(o => o.SingleLine = true))
+                        .AddConsole()
+                        .AddSimpleConsole(o => o.SingleLine = true)
+                        .SetMinimumLevel(LogLevel.Debug))
                     .CreateLogger("logger");
 
             // create telemetry client 

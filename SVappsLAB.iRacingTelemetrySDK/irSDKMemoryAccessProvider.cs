@@ -49,9 +49,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
         string? _ibtFileName;
         byte[]? _telemetryDataBuffer;
         byte* _dataPtr;
-        irsdk_header _header;
         int _oldVarBufLen;
-        VarHeaderDictionary? _varHeaders;
         int _lastTickCount = 0; // latest tick count iRacing wrote to
         int _lastSessionInfoUpdate = -1; // latest session info update counter
 
@@ -80,18 +78,12 @@ namespace SVappsLAB.iRacingTelemetrySDK
             _mmFile = MemoryMappedFile.CreateFromFile(_ibtFileName, FileMode.Open, null, 0, MemoryMappedFileAccess.Read);
             _viewAccessor = _mmFile.CreateViewAccessor(0, 0, MemoryMappedFileAccess.Read);
             _viewAccessor!.SafeMemoryMappedViewHandle.AcquirePointer(ref _dataPtr);
-
-            // read header 
-            _header = GetHeader();
         }
         public void OpenDataSource()
         {
             _mmFile = MemoryMappedFile.OpenExisting(IRSDK_MemMapFileName);
             _viewAccessor = _mmFile.CreateViewAccessor();
             _viewAccessor!.SafeMemoryMappedViewHandle.AcquirePointer(ref _dataPtr);
-
-            // read header 
-            _header = GetHeader();
 
             // data ready event
             var rawEvent = PInvoke.OpenEvent(SYNCHRONIZE_ACCESS, false, IRSDK_DataValidEventName);
@@ -116,25 +108,44 @@ namespace SVappsLAB.iRacingTelemetrySDK
         public irsdk_header GetHeader()
         {
             var ros = new ReadOnlySpan<byte>(_dataPtr, sizeof(irsdk_header));
-            _header = MemoryMarshal.AsRef<irsdk_header>(ros);
+            var header = MemoryMarshal.AsRef<irsdk_header>(ros);
 
             // varbuff changed?
-            if (_oldVarBufLen != _header.bufLen)
+            if (_oldVarBufLen != header.bufLen)
             {
-                _logger.LogDebug("buffLen changed ({oldLength} to {newLength}), updating headers and buffer", _oldVarBufLen, _header.bufLen);
+                _logger.LogDebug("buffLen changed ({oldLength} to {newLength}), updating headers and buffer", _oldVarBufLen, header.bufLen);
 
-                _varHeaders = ReadVarHeaders();
-                _oldVarBufLen = _header.bufLen;
+                _oldVarBufLen = header.bufLen;
 
                 // allocate new data buffer
-                _telemetryDataBuffer = new byte[_header.bufLen];
+                _telemetryDataBuffer = new byte[header.bufLen];
             }
 
-            return _header;
+            return header;
         }
         public string GetSessionInfoYaml()
         {
-            var sessInfo = Marshal.PtrToStringAnsi(new IntPtr(_dataPtr + _header.sessionInfoOffset));
+            var offSet = GetHeader().sessionInfoOffset;
+
+            // this is the maximum length
+            var len = GetHeader().sessionInfoLen;
+
+            // but the actual length may be shorter, so we need to find
+            // the null terminator, if there is one
+            Span<byte> span = new Span<byte>(_dataPtr + offSet, len);
+            for (int i = 0; i < span.Length; i++)
+            {
+                if (span[i] == 0)
+                {
+                    _logger.LogDebug("SessionInfo: length is {len}, but found null terminator at {i}", len, i);
+
+                    // adjust length
+                    len = i;
+                    break;
+                }
+            }
+
+            var sessInfo = Marshal.PtrToStringAnsi(new IntPtr(_dataPtr + GetHeader().sessionInfoOffset), len);
             return sessInfo;
         }
         public int GetNumRecordsInIBTFile()
@@ -145,7 +156,8 @@ namespace SVappsLAB.iRacingTelemetrySDK
 
         public object GetVarValue(string varName)
         {
-            if (!_varHeaders!.TryGetValue(varName, out irsdk_varHeader vh))
+            var varHeaders = GetVarHeaders();
+            if (!varHeaders!.TryGetValue(varName, out irsdk_varHeader vh))
             {
                 throw new Exception($"the telemetry value '{varName}' does not exist");
             }
@@ -241,7 +253,8 @@ namespace SVappsLAB.iRacingTelemetrySDK
         }
         internal VarHeaderDictionary? GetVarHeaders()
         {
-            return _varHeaders;
+            var varHeaders = ReadVarHeaders(GetHeader());
+            return varHeaders;
         }
         irsdk_varBuf GetLatestVarBuff()
         {
@@ -271,8 +284,10 @@ namespace SVappsLAB.iRacingTelemetrySDK
         // with IBT files, the 'recNum' tells us which data record in the mmf we should read
         void CopyNewTelemetryDataToBuffer(int recNum = 0)
         {
-            var offset = _header.GetMostRecentBuffer().bufOffset + (recNum * _header.bufLen);
-            var ros = new ReadOnlySpan<byte>(_dataPtr + offset, _header.bufLen);
+            var header = GetHeader();
+
+            var offset = header.GetMostRecentBuffer().bufOffset + (recNum * header.bufLen);
+            var ros = new ReadOnlySpan<byte>(_dataPtr + offset, header.bufLen);
             ros.CopyTo(_telemetryDataBuffer);
         }
 
@@ -303,12 +318,12 @@ namespace SVappsLAB.iRacingTelemetrySDK
         {
             Dispose(false);
         }
-        VarHeaderDictionary ReadVarHeaders()
+        VarHeaderDictionary ReadVarHeaders(irsdk_header header)
         {
-            var ros = new ReadOnlySpan<irsdk_varHeader>(_dataPtr + _header.varHeaderOffset, _header.numVars);
+            var ros = new ReadOnlySpan<irsdk_varHeader>(_dataPtr + header.varHeaderOffset, header.numVars);
 
             var dict = new VarHeaderDictionary();
-            for (int i = 0; i < _header.numVars; i++)
+            for (int i = 0; i < header.numVars; i++)
             {
                 var vh = ros[i];
                 var name = Marshal.PtrToStringAnsi(new IntPtr(vh.name)) ?? String.Empty;

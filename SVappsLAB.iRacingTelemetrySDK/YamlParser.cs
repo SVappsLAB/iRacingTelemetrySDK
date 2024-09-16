@@ -71,7 +71,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
             // this seems to be the most common issue with the iRacing yaml
 
             var badDataStart = ex.Start.Index;
-            var badDataEnd = FindEndOfBadData(yaml, badDataStart, ["\r\n", "\n", "#"]);
+            var badDataEnd = FindEndOfBadData(yaml, badDataStart, ["\r\n", "\n", "#", "\0"]);
 
             // create new string with the bad data escaped
             var escapedBadData = $"\"{yaml.Substring(badDataStart, badDataEnd - badDataStart)}\"";

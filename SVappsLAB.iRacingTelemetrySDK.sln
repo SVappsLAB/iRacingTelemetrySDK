@@ -28,6 +28,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LocationAndWarnings", "Samp
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SpeedRPMGear", "Samples\SpeedRPMGear\SpeedRPMGear.csproj", "{C95FE96C-7549-4AF7-8939-F9E37B79E35A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DriverDistanceAroundTrack", "Samples\DriverDistanceAroundTrack\DriverDistanceAroundTrack.csproj", "{D857E74D-FB3D-4D5F-B44F-B96284908C62}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -66,6 +68,10 @@ Global
 		{C95FE96C-7549-4AF7-8939-F9E37B79E35A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C95FE96C-7549-4AF7-8939-F9E37B79E35A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C95FE96C-7549-4AF7-8939-F9E37B79E35A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D857E74D-FB3D-4D5F-B44F-B96284908C62}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D857E74D-FB3D-4D5F-B44F-B96284908C62}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D857E74D-FB3D-4D5F-B44F-B96284908C62}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D857E74D-FB3D-4D5F-B44F-B96284908C62}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -78,6 +84,7 @@ Global
 		{3A00C141-3FA6-415C-A4CE-BAE08F1E217F} = {C9AEF22A-43D3-47DE-9074-0849EFB3D217}
 		{B264F7CE-0F78-4AC1-9728-CAE3E063291F} = {C9AEF22A-43D3-47DE-9074-0849EFB3D217}
 		{C95FE96C-7549-4AF7-8939-F9E37B79E35A} = {C9AEF22A-43D3-47DE-9074-0849EFB3D217}
+		{D857E74D-FB3D-4D5F-B44F-B96284908C62} = {C9AEF22A-43D3-47DE-9074-0849EFB3D217}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {A774B726-6C97-4ECE-AB77-C788463CA995}
