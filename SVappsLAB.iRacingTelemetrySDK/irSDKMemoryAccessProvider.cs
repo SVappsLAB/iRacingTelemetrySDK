@@ -232,7 +232,9 @@ namespace SVappsLAB.iRacingTelemetrySDK
             }
 
             var latestTickCount = GetLatestVarBuff().tickCount;
-            if (signaled && latestTickCount > _lastTickCount)
+
+            // if we missed any telemetry data, log that it happened
+            if (latestTickCount > _lastTickCount)
             {
                 var tickDiff = latestTickCount - _lastTickCount - 1;
                 if (_lastTickCount != 0 && tickDiff > 0)
@@ -240,21 +242,21 @@ namespace SVappsLAB.iRacingTelemetrySDK
                     _dataDropCount += tickDiff;
                     _logger.LogWarning("dropped {count} data records. {total} total", tickDiff, _dataDropCount);
                 }
-
-                // we have new data - copy to the buffer for later reading
-                CopyNewTelemetryDataToBuffer();
-                _lastTickCount = latestTickCount;
-                return true;
             }
 
-            //// something wrong. disconnected?  need to reset
-            //if (latestTickCount < _lastTickCount)
-            //{
-            //    _logger.LogWarning("new data is older than our last sample. lost connection?  resetting");
-            //    _lastTickCount = Int32.MaxValue;
-            //}
+            // did we loose sync?  perhaps we disconnected or a new session started
+            // log that it happened. we will resync below
+            if (latestTickCount < _lastTickCount)
+            {
+                _logger.LogDebug("new data is older than our last sample. lost connection?  will resync");
+            }
 
-            return false;
+            // copy new data to the access buffer for later reading
+            CopyNewTelemetryDataToBuffer();
+            // resync - update our last tick count
+            _lastTickCount = latestTickCount;
+
+            return true;
         }
 
         // this is called by the IBT file processor

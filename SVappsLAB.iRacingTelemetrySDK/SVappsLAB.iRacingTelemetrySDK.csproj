@@ -25,11 +25,11 @@
 	<PropertyGroup>
 		<PackageId>SVappsLAB.iRacingTelemetrySDK</PackageId>
 		<Title>iRacing Telemetry SDK</Title>
-		<Description>An SDK for accessing iRacing telemetry</Description>
+		<Description>A C# SDK for accessing iRacing telemetry (iRacing SDK)</Description>
 		<PackageTags>iRacing iRacingSDK irsdk IBT Telemetry SDK API</PackageTags>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PackageLicenseFile>LICENSE</PackageLicenseFile>
-		<Version>0.6.2</Version>
+		<Version>0.6.3</Version>
 		<Authors>Scott Velez</Authors>
 		<Company>SVappsLAB</Company>
 		<Copyright>Copyright (c) 2024 SVappsLAB</Copyright>
