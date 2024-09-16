@@ -101,6 +101,9 @@ namespace DumpVariables_DumpSessionInfo
 
             void writeVariablesFile(IEnumerable<TelemetryVariable> variables)
             {
+                // sort to ensure consistent order
+                variables = variables.OrderBy(v => v.Name);
+
                 // open telemetryVariables file and write
                 using (var writer = new StreamWriter(VARIABLES_FILENAME))
                 {
