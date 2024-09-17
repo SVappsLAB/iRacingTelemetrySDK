@@ -14,8 +14,6 @@
  * limitations under the License.using Microsoft.CodeAnalysis;
 **/
 
-using Microsoft.Extensions.Logging;
-using SVappsLAB.iRacingTelemetrySDK.irSDKDefines;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -23,6 +21,8 @@ using System.IO.MemoryMappedFiles;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
+using Microsoft.Extensions.Logging;
+using SVappsLAB.iRacingTelemetrySDK.irSDKDefines;
 
 namespace SVappsLAB.iRacingTelemetrySDK
 {
@@ -134,7 +134,29 @@ namespace SVappsLAB.iRacingTelemetrySDK
         }
         public string GetSessionInfoYaml()
         {
-            var sessInfo = Marshal.PtrToStringAnsi(new IntPtr(_dataPtr + _header.sessionInfoOffset), _header.sessionInfoLen);
+            var header = GetHeader();
+            var offSet = header.sessionInfoOffset;
+
+            // this is the maximum length
+            var len = header.sessionInfoLen;
+
+            // but the actual length may be shorter, so we need
+            // to scan and find the null terminator, if there is one
+            Span<byte> span = new Span<byte>(_dataPtr + offSet, len);
+            for (int i = 0; i < span.Length; i++)
+            {
+                if (span[i] == 0)
+                {
+                    _logger.LogDebug("SessionInfo: length is {len}, but found null terminator at {i}", len, i);
+
+                    // adjust length
+                    len = i;
+                    break;
+                }
+            }
+
+            // convert buffer (from 'offSet' to 'len') to a string
+            var sessInfo = Marshal.PtrToStringAnsi(new IntPtr(_dataPtr + GetHeader().sessionInfoOffset), len);
             return sessInfo;
         }
         public int GetNumRecordsInIBTFile()
@@ -210,7 +232,9 @@ namespace SVappsLAB.iRacingTelemetrySDK
             }
 
             var latestTickCount = GetLatestVarBuff().tickCount;
-            if (signaled && latestTickCount > _lastTickCount)
+
+            // if we missed any telemetry data, log that it happened
+            if (latestTickCount > _lastTickCount)
             {
                 var tickDiff = latestTickCount - _lastTickCount - 1;
                 if (_lastTickCount != 0 && tickDiff > 0)
@@ -218,21 +242,21 @@ namespace SVappsLAB.iRacingTelemetrySDK
                     _dataDropCount += tickDiff;
                     _logger.LogWarning("dropped {count} data records. {total} total", tickDiff, _dataDropCount);
                 }
-
-                // we have new data - copy to the buffer for later reading
-                CopyNewTelemetryDataToBuffer();
-                _lastTickCount = latestTickCount;
-                return true;
             }
 
-            //// something wrong. disconnected?  need to reset
-            //if (latestTickCount < _lastTickCount)
-            //{
-            //    _logger.LogWarning("new data is older than our last sample. lost connection?  resetting");
-            //    _lastTickCount = Int32.MaxValue;
-            //}
+            // did we loose sync?  perhaps we disconnected or a new session started
+            // log that it happened. we will resync below
+            if (latestTickCount < _lastTickCount)
+            {
+                _logger.LogDebug("new data is older than our last sample. lost connection?  will resync");
+            }
 
-            return false;
+            // copy new data to the access buffer for later reading
+            CopyNewTelemetryDataToBuffer();
+            // resync - update our last tick count
+            _lastTickCount = latestTickCount;
+
+            return true;
         }
 
         // this is called by the IBT file processor
