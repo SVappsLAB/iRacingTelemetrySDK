@@ -35,11 +35,14 @@ namespace LocationAndWarnings
                     .AddConsole().AddSimpleConsole(o => o.SingleLine = true))
                     .CreateLogger("logger");
 
-            var ibtFile = args.Length == 1 ? args[0] : null;
-            logger.LogInformation("processing data from \"{source}\"", String.IsNullOrEmpty(ibtFile) ? "online LIVE session" : "offline IBT file");
+            IBTOptions? ibtOptions = null;
+            if (args.Length == 1)
+                ibtOptions = new IBTOptions(args[0]);
+
+            logger.LogInformation("processing data from \"{source}\"", ibtOptions == null ? "online LIVE session" : "offline IBT file");
 
             // create telemetry client 
-            using var tc = TelemetryClient<TelemetryData>.Create(logger, new IBTOptions(ibtFile));
+            using var tc = TelemetryClient<TelemetryData>.Create(logger, ibtOptions);
 
             // subscribe to telemetry updates
             tc.OnTelemetryUpdate += OnTelemetryUpdate;

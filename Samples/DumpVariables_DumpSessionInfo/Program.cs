@@ -26,8 +26,9 @@ namespace DumpVariables_DumpSessionInfo
 
         static async Task Main(string[] args)
         {
-            const string VARIABLES_FILENAME = "iRacingVariables.csv";
-            const string SESSIONINFO_FILENAME = "IRacingSessionInfo.yaml";
+            string timeStamp = DateTime.Now.ToString("yyyyMMdd-HHMMss");
+            string VARIABLES_FILENAME = $"iRacingVariables-{timeStamp}.csv";
+            string SESSIONINFO_FILENAME = $"IRacingSessionInfo-{timeStamp}.yaml";
             // amount of time to wait for data
             const int WAIT_FOR_DATA_SECS = 30;
 
@@ -74,9 +75,9 @@ namespace DumpVariables_DumpSessionInfo
                 await Task.Delay(TimeSpan.FromSeconds(1));
             }
 
-            // wait for exit
-            await monitorTask;
-            logger.LogInformation("done processing");
+            // wait for 2 seconds to exit
+            bool success = monitorTask.Wait(2 * 1000);
+            logger.LogInformation("Done. Status: {status}", success ? "successful" : "timeout-" + monitorTask.Status);
 
 
             // connection event handler
@@ -105,12 +106,12 @@ namespace DumpVariables_DumpSessionInfo
                 using (var writer = new StreamWriter(VARIABLES_FILENAME))
                 {
                     // header
-                    writer.WriteLine("name, desc, units, type, length, isTimeValue");
+                    writer.WriteLine("name,type,length,isTimeValue,desc,units");
 
                     // data
                     foreach (var v in variables)
                     {
-                        var line = $"{v.Name},{v.Desc},{v.Units},{v.Type.Name},{v.Length},{v.IsTimeValue}";
+                        var line = $"{v.Name},{v.Type.Name},{v.Length},{v.IsTimeValue},{v.Desc},{v.Units}";
                         writer.WriteLine(line);
                     }
                 }
