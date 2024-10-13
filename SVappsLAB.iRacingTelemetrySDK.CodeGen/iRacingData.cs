@@ -26,7 +26,7 @@ using System.Collections.Generic;
 namespace SVappsLAB.iRacingTelemetrySDK
 {
     public record struct VarItem(string Name, int Type, int Length, bool IsTimeValue, string Desc, string Units);
-    public class iRacingData
+    public class iRacingVars
     {
         // a dictionary of all known variables from the iRacing SDK - both live sessions and offline ibt files
         // this data is used by the code generation to generate typed variables for your code.
