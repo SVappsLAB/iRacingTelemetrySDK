@@ -49,7 +49,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
                 } 
             }";
 
-        static iRacingData _iRacingData = new iRacingData();
+        static iRacingVars _iRacingData = new iRacingVars();
 
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {

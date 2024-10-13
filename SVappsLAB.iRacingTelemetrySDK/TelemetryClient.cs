@@ -190,7 +190,8 @@ namespace SVappsLAB.iRacingTelemetrySDK
                 return list;
             }
 
-            return Task.FromResult(unsafeInternal());
+            var sortedList = unsafeInternal().OrderBy(v => v.Name) as IEnumerable<TelemetryVariable>;
+            return Task.FromResult(sortedList);
         }
 
         public string GetRawTelemetrySessionInfoYaml()
@@ -243,7 +244,12 @@ namespace SVappsLAB.iRacingTelemetrySDK
             Dispose(false);
         }
         private bool IsOnlineMode => _ibtOptions == null;
-        private void UpdateSession()
+        Task UpdateSession()
+        {
+            var task = Task.Run(() => UpdateSessionHelper());
+            return task;
+        }
+        void UpdateSessionHelper()
         {
             var sw = new Stopwatch();
             sw.Start();
@@ -306,6 +312,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
             return -1;
         }
 
+        Task _sessionInfoProcessingTask = Task.CompletedTask;
         private async Task WaitForData(CancellationToken ct)
         {
             // ensure initialization
@@ -340,7 +347,13 @@ namespace SVappsLAB.iRacingTelemetrySDK
             if (_irSDKMemoryProvider.IsSessionInfoUpdated())
             {
                 if (OnSessionInfoUpdate != null)
-                    UpdateSession();
+                {
+                    if (!_sessionInfoProcessingTask.IsCompleted)
+                    {
+                        _logger.LogWarning("sessionInfo processing task is still running");
+                    }
+                    _sessionInfoProcessingTask = UpdateSession();
+                }
             }
 
             // wait for new telemetry data
@@ -392,7 +405,9 @@ namespace SVappsLAB.iRacingTelemetrySDK
                 if (_irSDKMemoryProvider.IsSessionInfoUpdated())
                 {
                     if (OnSessionInfoUpdate != null)
-                        UpdateSession();
+                    {
+                        await UpdateSession();
+                    }
                 }
 
                 governor = new SimpleGovernor(_logger, _ibtOptions!.PlayBackSpeedMultiplier);
