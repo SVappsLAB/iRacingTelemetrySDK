@@ -26,4 +26,4 @@ jobs:
         # explicitly use 'Release' for enable pack to find the directory
         run: dotnet pack --no-restore -c Release -o ./artifacts SVappsLAB.iRacingTelemetrySDK
       - name: publishPackage
-        run: dotnet nuget push ./artifacts/*.nupkg --api-key ${{secrets.NUGET_API_KEY}} --source https://api.nuget.org/v3/index.json
+        run: dotnet nuget push ./Sdk/artifacts/*.nupkg --api-key ${{secrets.NUGET_API_KEY}} --source https://api.nuget.org/v3/index.json
