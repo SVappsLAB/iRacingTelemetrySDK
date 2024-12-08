@@ -11,9 +11,9 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="8.0.0" />
   </ItemGroup>
 
-    <ItemGroup>
-      <ProjectReference Include="..\..\SVappsLAB.iRacingTelemetrySDK\SVappsLAB.iRacingTelemetrySDK.csproj" />
-      <ProjectReference Include="..\..\SVappsLAB.iRacingTelemetrySDK.CodeGen\SVappsLAB.iRacingTelemetrySDK.CodeGen.csproj" OutputItemType="Analyzer" />
-    </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\SVappsLAB.iRacingTelemetrySDK\SVappsLAB.iRacingTelemetrySDK.csproj" />
+    <ProjectReference Include="..\..\SVappsLAB.iRacingTelemetrySDK.CodeGen\SVappsLAB.iRacingTelemetrySDK.CodeGen.csproj" OutputItemType="Analyzer" />
+  </ItemGroup>
 
 </Project>

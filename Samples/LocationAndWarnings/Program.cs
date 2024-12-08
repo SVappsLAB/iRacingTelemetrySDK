@@ -16,7 +16,6 @@
 
 using Microsoft.Extensions.Logging;
 using SVappsLAB.iRacingTelemetrySDK;
-using SVappsLAB.iRacingTelemetrySDK.Enums;
 using SVappsLAB.iRacingTelemetrySDK.Flags;
 
 namespace LocationAndWarnings
