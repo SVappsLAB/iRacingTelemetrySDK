@@ -42,6 +42,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\SVappsLAB.iRacingTelemetrySDK\SVappsLAB.iRacingTelemetrySDK.csproj" />
+    <ProjectReference Include="..\..\SVappsLAB.iRacingTelemetrySDK.Enums\SVappsLAB.iRacingTelemetrySDK.Enums.csproj" OutputItemType="Analyzer" />
     <ProjectReference Include="..\..\SVappsLAB.iRacingTelemetrySDK.CodeGen\SVappsLAB.iRacingTelemetrySDK.CodeGen.csproj" OutputItemType="Analyzer" />
   </ItemGroup>
 

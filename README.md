@@ -9,14 +9,14 @@
 - **Playback of saved IBT Telemetry Data:** In addition to live data access, the SDK can read previously saved iRacing IBT files and play them back as if it were live data, using the same API.
 This allows you to analyze and process historical telemetry data, the same way you would with live data.
 
+- **Strongly Typed Telemetry Data**: Source Generation is used to create strongly typed iRacing variables, such as Floats (speed, rpm) and Enums (track surface, pit service state).
+
 - **Optimized Performance:** The SDK uses techniques such as asynchronous Task's, ref struct's and ReadOnlySpan's to minimize memory allocations and maximize performance.
 When processing IBT files for example, the SDK is able to process 1 hour of saved telemetry data in under 1/2 second. A rate of over 300,000 telemetry records/sec.
 
-- **Strongly Typed Telemetry Data**: Source Generation is used to create a strongly typed `TelemetryData` struct, with the iRacing variables you choose.
-
 ## Telemetry Variables
 
-The iRacing simulator produces extensive telemetry data. This SDK allows you to select the variables to track in your program and generates a strongly-typed `TelemetryData` struct with those variables.
+The iRacing simulator generates extensive telemetry data. This SDK lets you select which telemetry data you want to track and generates a strongly-typed struct with named variables you can access directly in your project.
 
 ### Availability
 
@@ -38,11 +38,11 @@ To incorporate **iRacingTelemetrySDK** into your projects, follow these steps:
 
 1. Add the **RequiredTelemetryVars** attribute to the main class of your project
 
-    The attribute takes an array of strings.  The string values, are the name of the iRacing variables you want to use in your program.
+    The attribute takes an array of strings.  The string values, are the name of the iRacing telemetry variables you want to use in your program.
 
     ```csharp
     // these are the telemetry variables we want to track
-    [RequiredTelemetryVars(["gear", "isOnTrackCar", "rpm", "speed"])]
+    [RequiredTelemetryVars(["isOnTrackCar", "rpm", "speed", "PlayerTrackSurface"])]
 
     internal class Program
     {
@@ -53,7 +53,7 @@ To incorporate **iRacingTelemetrySDK** into your projects, follow these steps:
     A source generator will be leveraged to create a new .Net `TelemetryData` type you can use in your code.  For the attribute above, the created type will look like
 
     ```csharp
-    public record struct TelemetryData(Int32 Gear,Boolean IsOnTrackCar,Single RPM,Single Speed);
+    public record struct TelemetryData(Boolean IsOnTrackCar,Single RPM,Single Speed, irsdk_TrkLoc PlayerTrackSurface);
     ```
 1. Create an instance of the TelemetryClient
 
@@ -85,7 +85,7 @@ To incorporate **iRacingTelemetrySDK** into your projects, follow these steps:
     void OnTelemetryUpdate(object? _sender, TelemetryData e)
     {
         // do something with the telemetry data
-        logger.LogInformation("gear: {gear}, rpm: {rpm}, speed: {speed}", e.Gear, e.RPM, e.Speed);
+        logger.LogInformation("rpm: {rpm}, speed: {speed}, track surface: {trksuf}", e.RPM, e.Speed, e.PlayerTrackSurface);
     }
     ```
 

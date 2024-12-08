@@ -9,12 +9,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="8.0.0" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\..\SVappsLAB.iRacingTelemetrySDK\SVappsLAB.iRacingTelemetrySDK.csproj" />
-    <ProjectReference Include="..\..\SVappsLAB.iRacingTelemetrySDK.Enums\SVappsLAB.iRacingTelemetrySDK.Enums.csproj" OutputItemType="Analyzer" />
-    <ProjectReference Include="..\..\SVappsLAB.iRacingTelemetrySDK.CodeGen\SVappsLAB.iRacingTelemetrySDK.CodeGen.csproj" OutputItemType="Analyzer" />
+    <PackageReference Include="SVappsLAB.iRacingTelemetrySDK" Version="0.7.0" />
   </ItemGroup>
 
 </Project>
