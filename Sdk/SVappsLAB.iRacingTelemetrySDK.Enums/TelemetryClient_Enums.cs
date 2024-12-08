@@ -16,7 +16,7 @@
 
 
 // enums
-namespace SVappsLAB.iRacingTelemetrySDK.Enums
+namespace SVappsLAB.iRacingTelemetrySDK
 {
     public enum irsdk_TrkLoc
     {

@@ -25,16 +25,19 @@ namespace SpeedRPMGear
     {
         static async Task Main(string[] args)
         {
-            // if you pass in a IBT filename, we'll use that, otherwise default to LIVE mode
-            var ibtFile = args.Length == 1 ? args[0] : null;
             var counter = 0;
             var logger = LoggerFactory
                     .Create(builder => builder
                     .AddConsole().AddSimpleConsole(o => o.SingleLine = true))
                     .CreateLogger("logger");
 
+            // if you pass in a IBT filename, we'll use that, otherwise default to LIVE mode
+            IBTOptions ibtOptions = null;
+            if (args.Length == 1)
+                ibtOptions = new IBTOptions(args[0]);
+
             // create telemetry client 
-            using var tc = TelemetryClient<TelemetryData>.Create(logger, new IBTOptions(ibtFile));
+            using var tc = TelemetryClient<TelemetryData>.Create(logger, ibtOptions);
 
             // subscribe to telemetry updates
             tc.OnTelemetryUpdate += OnTelemetryUpdate;

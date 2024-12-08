@@ -93,7 +93,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
                     {
                         0 => varItem.Length == 1 ? typeof(byte) : typeof(byte[]),
                         1 => varItem.Length == 1 ? typeof(bool) : typeof(bool[]),
-                        2 => varItem.Length == 1 ? typeof(int) : typeof(int[]),
+                        2 => GetIntOrEnumType(rawVariableName, varItem.Length),
                         3 => varItem.Length == 1 ? typeof(int) : typeof(int[]),
                         4 => varItem.Length == 1 ? typeof(float) : typeof(float[]),
                         5 => varItem.Length == 1 ? typeof(double) : typeof(double[]),
@@ -163,6 +163,26 @@ namespace SVappsLAB.iRacingTelemetrySDK
             // add source to compilation
             spc.AddSource("iRacingTelemetrySDK.g.cs", code);
         }
+
+        private Type GetIntOrEnumType(string varName, int length)
+        {
+            var type = varName switch
+            {
+                "CarIdxTrackSurface" => length == 1 ? typeof(irsdk_TrkLoc) : typeof(irsdk_TrkLoc[]),
+                "CarIdxTrackSurfaceMaterial" => length == 1 ? typeof(irsdk_TrkSurf) : typeof(irsdk_TrkSurf[]),
+                "CarLeftRight" => length == 1 ? typeof(irsdk_CarLeftRight) : typeof(irsdk_CarLeftRight[]),
+                "PaceMode" => length == 1 ? typeof(irsdk_PaceMode) : typeof(irsdk_PaceMode[]),
+                "PlayerCarPitSvStatus" => length == 1 ? typeof(irsdk_PitSvStatus) : typeof(irsdk_PitSvStatus[]),
+                "PlayerTrackSurface" => length == 1 ? typeof(irsdk_TrkLoc) : typeof(irsdk_TrkLoc[]),
+                "PlayerTrackSurfaceMaterial" => length == 1 ? typeof(irsdk_TrkSurf) : typeof(irsdk_TrkSurf[]),
+                "SessionState" => length == 1 ? typeof(irsdk_SessionState) : typeof(irsdk_SessionState[]),
+                "TrackWetness" => length == 1 ? typeof(irsdk_TrackWetness) : typeof(irsdk_TrackWetness[]),
+                // default to int
+                _ => length == 1 ? typeof(int) : typeof(int[]),
+            };
+            return type;
+        }
     }
+
 }
 

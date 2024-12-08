@@ -17,7 +17,6 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using SVappsLAB.iRacingTelemetrySDK;
-using SVappsLAB.iRacingTelemetrySDK.Enums;
 using SVappsLAB.iRacingTelemetrySDK.Models;
 
 namespace Live_Tests
@@ -83,7 +82,7 @@ namespace Live_Tests
             // telemetry data we expect to receive
             var engineWarnings = 0;
             var isOnTrackCar = false;
-            var playerTrackSurface = 0;
+            irsdk_TrkLoc playerTrackSurface = irsdk_TrkLoc.irsdk_NotInWorld;
             var rpm = 0.0f;
             var sessionTick = 0.0d;
             var sessionTimeRemain = 0.0d;
