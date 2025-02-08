@@ -1,12 +1,12 @@
 /**
  * Copyright (C)2024 Scott Velez
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -14,10 +14,10 @@
  * limitations under the License.using Microsoft.CodeAnalysis;
 **/
 
-/* 
+/*
  * This file is used by the code generation tooling to generate the TelemetryData structure with strongly typed properties.
  * It is NOT meant to be used directly.
- * 
+ *
 **/
 
 using System;
@@ -49,7 +49,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
             { "CRshockVel", new VarItem("CRshockVel", 4, 1, false, "CR shock velocity", "m/s") },
             { "CRshockVel_ST", new VarItem("CRshockVel_ST", 4, 6, true, "CR shock velocity at 360 Hz", "m/s") },
             { "CamCameraNumber", new VarItem("CamCameraNumber", 2, 1, false, "Active camera number", "") },
-            { "CamCameraState", new VarItem("CamCameraState", 3, 1, false, "State of camera system", "irsdk_CameraState") },
+            { "CamCameraState", new VarItem("CamCameraState", 3, 1, false, "State of camera system", "CameraState") },
             { "CamCarIdx", new VarItem("CamCarIdx", 2, 1, false, "Active camera's focus car index", "") },
             { "CamGroupNumber", new VarItem("CamGroupNumber", 2, 1, false, "Active camera group number", "") },
             { "CarDistAhead", new VarItem("CarDistAhead", 4, 1, false, "Distance to first car in front of player in meters", "m") },
@@ -69,19 +69,19 @@ namespace SVappsLAB.iRacingTelemetrySDK
             { "CarIdxOnPitRoad", new VarItem("CarIdxOnPitRoad", 1, 64, false, "On pit road between the cones by car index", "") },
             { "CarIdxP2P_Count", new VarItem("CarIdxP2P_Count", 2, 64, false, "Push2Pass count of usage (or remaining in Race)", "") },
             { "CarIdxP2P_Status", new VarItem("CarIdxP2P_Status", 1, 64, false, "Push2Pass active or not", "") },
-            { "CarIdxPaceFlags", new VarItem("CarIdxPaceFlags", 3, 64, false, "Pacing status flags for each car", "irsdk_PaceFlags") },
+            { "CarIdxPaceFlags", new VarItem("CarIdxPaceFlags", 3, 64, false, "Pacing status flags for each car", "PaceFlags") },
             { "CarIdxPaceLine", new VarItem("CarIdxPaceLine", 2, 64, false, "What line cars are pacing in  or -1 if not pacing", "") },
             { "CarIdxPaceRow", new VarItem("CarIdxPaceRow", 2, 64, false, "What row cars are pacing in  or -1 if not pacing", "") },
             { "CarIdxPosition", new VarItem("CarIdxPosition", 2, 64, false, "Cars position in race by car index", "") },
             { "CarIdxQualTireCompound", new VarItem("CarIdxQualTireCompound", 2, 64, false, "Cars Qual tire compound", "") },
             { "CarIdxQualTireCompoundLocked", new VarItem("CarIdxQualTireCompoundLocked", 1, 64, false, "Cars Qual tire compound is locked-in", "") },
             { "CarIdxRPM", new VarItem("CarIdxRPM", 4, 64, false, "Engine rpm by car index", "revs/min") },
-            { "CarIdxSessionFlags", new VarItem("CarIdxSessionFlags", 3, 64, false, "Session flags for each player", "irsdk_Flags") },
+            { "CarIdxSessionFlags", new VarItem("CarIdxSessionFlags", 3, 64, false, "Session flags for each player", "SessionFlags") },
             { "CarIdxSteer", new VarItem("CarIdxSteer", 4, 64, false, "Steering wheel angle by car index", "rad") },
             { "CarIdxTireCompound", new VarItem("CarIdxTireCompound", 2, 64, false, "Cars current tire compound", "") },
-            { "CarIdxTrackSurface", new VarItem("CarIdxTrackSurface", 2, 64, false, "Track surface type by car index", "irsdk_TrkLoc") },
-            { "CarIdxTrackSurfaceMaterial", new VarItem("CarIdxTrackSurfaceMaterial", 2, 64, false, "Track surface material type by car index", "irsdk_TrkSurf") },
-            { "CarLeftRight", new VarItem("CarLeftRight", 2, 1, false, "Notify if car is to the left or right of driver", "irsdk_CarLeftRight") },
+            { "CarIdxTrackSurface", new VarItem("CarIdxTrackSurface", 2, 64, false, "Track surface type by car index", "TrackLocation") },
+            { "CarIdxTrackSurfaceMaterial", new VarItem("CarIdxTrackSurfaceMaterial", 2, 64, false, "Track surface material type by car index", "TrackSurface") },
+            { "CarLeftRight", new VarItem("CarLeftRight", 2, 1, false, "Notify if car is to the left or right of driver", "CarLeftRight") },
             { "ChanAvgLatency", new VarItem("ChanAvgLatency", 4, 1, false, "Communications average latency", "s") },
             { "ChanClockSkew", new VarItem("ChanClockSkew", 4, 1, false, "Communications server clock skew", "s") },
             { "ChanLatency", new VarItem("ChanLatency", 4, 1, false, "Communications latency", "s") },
@@ -96,7 +96,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
             { "DisplayUnits", new VarItem("DisplayUnits", 2, 1, false, "Default units for the user interface 0 = english 1 = metric", "") },
             { "DriverMarker", new VarItem("DriverMarker", 1, 1, false, "Driver activated flag", "") },
             { "Engine0_RPM", new VarItem("Engine0_RPM", 4, 1, false, "Engine0Engine rpm", "revs/min") },
-            { "EngineWarnings", new VarItem("EngineWarnings", 3, 1, false, "Bitfield for warning lights", "irsdk_EngineWarnings") },
+            { "EngineWarnings", new VarItem("EngineWarnings", 3, 1, false, "Bitfield for warning lights", "EngineWarnings") },
             { "EnterExitReset", new VarItem("EnterExitReset", 2, 1, false, "Indicate action the reset key will take 0 enter 1 exit 2 reset", "") },
             { "FastRepairAvailable", new VarItem("FastRepairAvailable", 2, 1, false, "How many fast repairs left  255 is unlimited", "") },
             { "FastRepairUsed", new VarItem("FastRepairUsed", 2, 1, false, "How many fast repairs used so far", "") },
@@ -214,10 +214,10 @@ namespace SVappsLAB.iRacingTelemetrySDK
             { "OnPitRoad", new VarItem("OnPitRoad", 1, 1, false, "Is the player car on pit road between the cones", "") },
             { "P2P_Count", new VarItem("P2P_Count", 2, 1, false, "Push2Pass count of usage (or remaining in Race) on your car", "") },
             { "P2P_Status", new VarItem("P2P_Status", 1, 1, false, "Push2Pass active or not on your car", "") },
-            { "PaceMode", new VarItem("PaceMode", 2, 1, false, "Are we pacing or not", "irsdk_PaceMode") },
+            { "PaceMode", new VarItem("PaceMode", 2, 1, false, "Are we pacing or not", "PaceMode") },
             { "PitOptRepairLeft", new VarItem("PitOptRepairLeft", 4, 1, false, "Time left for optional repairs if repairs are active", "s") },
             { "PitRepairLeft", new VarItem("PitRepairLeft", 4, 1, false, "Time left for mandatory pit repairs if repairs are active", "s") },
-            { "PitSvFlags", new VarItem("PitSvFlags", 3, 1, false, "Bitfield of pit service checkboxes", "irsdk_PitSvFlags") },
+            { "PitServiceFlags", new VarItem("PitServiceFlags", 3, 1, false, "Bitfield of pit service checkboxes", "PitServiceFlags") },
             { "PitSvFuel", new VarItem("PitSvFuel", 4, 1, false, "Pit service fuel add amount", "l or kWh") },
             { "PitSvLFP", new VarItem("PitSvLFP", 4, 1, false, "Pit service left front tire pressure", "kPa") },
             { "PitSvLRP", new VarItem("PitSvLRP", 4, 1, false, "Pit service left rear tire pressure", "kPa") },
@@ -236,7 +236,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
             { "PlayerCarIdx", new VarItem("PlayerCarIdx", 2, 1, false, "Players carIdx", "") },
             { "PlayerCarInPitStall", new VarItem("PlayerCarInPitStall", 1, 1, false, "Players car is properly in their pitstall", "") },
             { "PlayerCarMyIncidentCount", new VarItem("PlayerCarMyIncidentCount", 2, 1, false, "Players own incident count for this session", "") },
-            { "PlayerCarPitSvStatus", new VarItem("PlayerCarPitSvStatus", 2, 1, false, "Players car pit service status bits", "irsdk_PitSvStatus") },
+            { "PlayerCarPitSvStatus", new VarItem("PlayerCarPitSvStatus", 2, 1, false, "Players car pit service status bits", "PitServiceStatus") },
             { "PlayerCarPosition", new VarItem("PlayerCarPosition", 2, 1, false, "Players position in race", "") },
             { "PlayerCarPowerAdjust", new VarItem("PlayerCarPowerAdjust", 4, 1, false, "Players power adjust", "%") },
             { "PlayerCarSLBlinkRPM", new VarItem("PlayerCarSLBlinkRPM", 4, 1, false, "Shift light blink rpm", "revs/min") },
@@ -248,8 +248,8 @@ namespace SVappsLAB.iRacingTelemetrySDK
             { "PlayerCarWeightPenalty", new VarItem("PlayerCarWeightPenalty", 4, 1, false, "Players weight penalty", "kg") },
             { "PlayerFastRepairsUsed", new VarItem("PlayerFastRepairsUsed", 2, 1, false, "Players car number of fast repairs used", "") },
             { "PlayerTireCompound", new VarItem("PlayerTireCompound", 2, 1, false, "Players car current tire compound", "") },
-            { "PlayerTrackSurface", new VarItem("PlayerTrackSurface", 2, 1, false, "Players car track surface type", "irsdk_TrkLoc") },
-            { "PlayerTrackSurfaceMaterial", new VarItem("PlayerTrackSurfaceMaterial", 2, 1, false, "Players car track surface material type", "irsdk_TrkSurf") },
+            { "PlayerTrackSurface", new VarItem("PlayerTrackSurface", 2, 1, false, "Players car track surface type", "TrackLocation") },
+            { "PlayerTrackSurfaceMaterial", new VarItem("PlayerTrackSurfaceMaterial", 2, 1, false, "Players car track surface material type", "TrackSurface") },
             { "Precipitation", new VarItem("Precipitation", 4, 1, false, "Precipitation at start/finish line", "%") },
             { "PushToPass", new VarItem("PushToPass", 1, 1, false, "Push to pass button state", "") },
             { "PushToTalk", new VarItem("PushToTalk", 1, 1, false, "Push to talk button state", "") },
@@ -316,14 +316,14 @@ namespace SVappsLAB.iRacingTelemetrySDK
             { "Roll", new VarItem("Roll", 4, 1, false, "Roll orientation", "rad") },
             { "RollRate", new VarItem("RollRate", 4, 1, false, "Roll rate", "rad/s") },
             { "RollRate_ST", new VarItem("RollRate_ST", 4, 6, true, "Roll rate at 360 Hz", "rad/s") },
-            { "SessionFlags", new VarItem("SessionFlags", 3, 1, false, "Session flags", "irsdk_Flags") },
+            { "SessionFlags", new VarItem("SessionFlags", 3, 1, false, "Session flags", "SessionFlags") },
             { "SessionJokerLapsRemain", new VarItem("SessionJokerLapsRemain", 2, 1, false, "Joker laps remaining to be taken", "") },
             { "SessionLapsRemain", new VarItem("SessionLapsRemain", 2, 1, false, "Old laps left till session ends use SessionLapsRemainEx", "") },
             { "SessionLapsRemainEx", new VarItem("SessionLapsRemainEx", 2, 1, false, "New improved laps left till session ends", "") },
             { "SessionLapsTotal", new VarItem("SessionLapsTotal", 2, 1, false, "Total number of laps in session", "") },
             { "SessionNum", new VarItem("SessionNum", 2, 1, false, "Session number", "") },
             { "SessionOnJokerLap", new VarItem("SessionOnJokerLap", 1, 1, false, "Player is currently completing a joker lap", "") },
-            { "SessionState", new VarItem("SessionState", 2, 1, false, "Session state", "irsdk_SessionState") },
+            { "SessionState", new VarItem("SessionState", 2, 1, false, "Session state", "SessionState") },
             { "SessionTick", new VarItem("SessionTick", 2, 1, false, "Current update number", "") },
             { "SessionTime", new VarItem("SessionTime", 5, 1, false, "Seconds since session start", "s") },
             { "SessionTimeOfDay", new VarItem("SessionTimeOfDay", 4, 1, false, "Time of day in seconds", "s") },
@@ -361,7 +361,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
             { "TireSetsUsed", new VarItem("TireSetsUsed", 2, 1, false, "How many tire sets used so far", "") },
             { "TrackTemp", new VarItem("TrackTemp", 4, 1, false, "Deprecated  set to TrackTempCrew", "C") },
             { "TrackTempCrew", new VarItem("TrackTempCrew", 4, 1, false, "Temperature of track measured by crew around track", "C") },
-            { "TrackWetness", new VarItem("TrackWetness", 2, 1, false, "How wet is the average track surface", "irsdk_TrackWetness") },
+            { "TrackWetness", new VarItem("TrackWetness", 2, 1, false, "How wet is the average track surface", "TrackWetness") },
             { "VelocityX", new VarItem("VelocityX", 4, 1, false, "X velocity", "m/s") },
             { "VelocityX_ST", new VarItem("VelocityX_ST", 4, 6, true, "X velocity", "m/s at 360 Hz") },
             { "VelocityY", new VarItem("VelocityY", 4, 1, false, "Y velocity", "m/s") },
@@ -376,8 +376,8 @@ namespace SVappsLAB.iRacingTelemetrySDK
             { "WaterLevel", new VarItem("WaterLevel", 4, 1, false, "Engine coolant level", "l") },
             { "WaterTemp", new VarItem("WaterTemp", 4, 1, false, "Engine coolant temp", "C") },
             { "WeatherDeclaredWet", new VarItem("WeatherDeclaredWet", 1, 1, false, "The steward says rain tires can be used", "") },
-            // removed { "WeatherType", new VarItem("WeatherType", 2, 1, false, "Weather dynamics type", "irsdk_WeatherDynamics") },
-            // removed { "WeatherVersion", new VarItem("WeatherVersion", 2, 1, false, "Weather version", "irsdk_WeatherVersion") },
+            // removed { "WeatherType", new VarItem("WeatherType", 2, 1, false, "Weather dynamics type", "WeatherDynamics") },
+            // removed { "WeatherVersion", new VarItem("WeatherVersion", 2, 1, false, "Weather version", "WeatherVersion") },
             { "WindDir", new VarItem("WindDir", 4, 1, false, "Wind direction at start/finish line", "rad") },
             { "WindVel", new VarItem("WindVel", 4, 1, false, "Wind velocity at start/finish line", "m/s") },
             { "Yaw", new VarItem("Yaw", 4, 1, false, "Yaw orientation", "rad") },

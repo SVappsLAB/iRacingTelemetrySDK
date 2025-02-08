@@ -18,108 +18,108 @@
 // enums
 namespace SVappsLAB.iRacingTelemetrySDK
 {
-    public enum irsdk_TrkLoc
+    public enum TrackLocation
     {
-        irsdk_NotInWorld = -1,
-        irsdk_OffTrack = 0,
-        irsdk_InPitStall,
+        NotInWorld = -1,
+        OffTrack = 0,
+        InPitStall,
         // This indicates the lead in to pit road, as well as the pit road itself (where speed limits are enforced)
         // if you just want to know that your on the pit road surface look at the live value 'OnPitRoad'
-        irsdk_AproachingPits,
-        irsdk_OnTrack
+        AproachingPits,
+        OnTrack
     };
 
-    public enum irsdk_TrkSurf
+    public enum TrackSurface
     {
-        irsdk_SurfaceNotInWorld = -1,
-        irsdk_UndefinedMaterial = 0,
+        SurfaceNotInWorld = -1,
+        UndefinedMaterial = 0,
 
-        irsdk_Asphalt1Material,
-        irsdk_Asphalt2Material,
-        irsdk_Asphalt3Material,
-        irsdk_Asphalt4Material,
-        irsdk_Concrete1Material,
-        irsdk_Concrete2Material,
-        irsdk_RacingDirt1Material,
-        irsdk_RacingDirt2Material,
-        irsdk_Paint1Material,
-        irsdk_Paint2Material,
-        irsdk_Rumble1Material,
-        irsdk_Rumble2Material,
-        irsdk_Rumble3Material,
-        irsdk_Rumble4Material,
+        Asphalt1Material,
+        Asphalt2Material,
+        Asphalt3Material,
+        Asphalt4Material,
+        Concrete1Material,
+        Concrete2Material,
+        RacingDirt1Material,
+        RacingDirt2Material,
+        Paint1Material,
+        Paint2Material,
+        Rumble1Material,
+        Rumble2Material,
+        Rumble3Material,
+        Rumble4Material,
 
-        irsdk_Grass1Material,
-        irsdk_Grass2Material,
-        irsdk_Grass3Material,
-        irsdk_Grass4Material,
-        irsdk_Dirt1Material,
-        irsdk_Dirt2Material,
-        irsdk_Dirt3Material,
-        irsdk_Dirt4Material,
-        irsdk_SandMaterial,
-        irsdk_Gravel1Material,
-        irsdk_Gravel2Material,
-        irsdk_GrasscreteMaterial,
-        irsdk_AstroturfMaterial,
+        Grass1Material,
+        Grass2Material,
+        Grass3Material,
+        Grass4Material,
+        Dirt1Material,
+        Dirt2Material,
+        Dirt3Material,
+        Dirt4Material,
+        SandMaterial,
+        Gravel1Material,
+        Gravel2Material,
+        GrasscreteMaterial,
+        AstroturfMaterial,
     };
 
-    public enum irsdk_SessionState
+    public enum SessionState
     {
-        irsdk_StateInvalid = 0,
-        irsdk_StateGetInCar,
-        irsdk_StateWarmup,
-        irsdk_StateParadeLaps,
-        irsdk_StateRacing,
-        irsdk_StateCheckered,
-        irsdk_StateCoolDown
+        Invalid = 0,
+        GetInCar,
+        Warmup,
+        ParadeLaps,
+        Racing,
+        Checkered,
+        CoolDown
     };
 
-    public enum irsdk_CarLeftRight
+    public enum CarLeftRight
     {
-        irsdk_LROff = 0,
-        irsdk_LRClear,          // no cars around us.
-        irsdk_LRCarLeft,        // there is a car to our left.
-        irsdk_LRCarRight,       // there is a car to our right.
-        irsdk_LRCarLeftRight,   // there are cars on each side.
-        irsdk_LR2CarsLeft,      // there are two cars to our left.
-        irsdk_LR2CarsRight      // there are two cars to our right.
+        Off = 0,
+        Clear,          // no cars around us.
+        CarLeft,        // there is a car to our left.
+        CarRight,       // there is a car to our right.
+        CarLeftRight,   // there are cars on each side.
+        TwoCarsLeft,    // there are two cars to our left.
+        TwoCarsRight    // there are two cars to our right.
     };
 
-    public enum irsdk_PitSvStatus
+    public enum PitServiceStatus
     {
         // status
-        irsdk_PitSvNone = 0,
-        irsdk_PitSvInProgress,
-        irsdk_PitSvComplete,
+        None = 0,
+        InProgress,
+        Complete,
 
         // errors
-        irsdk_PitSvTooFarLeft = 100,
-        irsdk_PitSvTooFarRight,
-        irsdk_PitSvTooFarForward,
-        irsdk_PitSvTooFarBack,
-        irsdk_PitSvBadAngle,
-        irsdk_PitSvCantFixThat,
+        TooFarLeft = 100,
+        TooFarRight,
+        TooFarForward,
+        TooFarBack,
+        BadAngle,
+        CantFixThat,
     };
 
-    public enum irsdk_PaceMode
+    public enum PaceMode
     {
-        irsdk_PaceModeSingleFileStart = 0,
-        irsdk_PaceModeDoubleFileStart,
-        irsdk_PaceModeSingleFileRestart,
-        irsdk_PaceModeDoubleFileRestart,
-        irsdk_PaceModeNotPacing,
+        SingleFileStart = 0,
+        DoubleFileStart,
+        SingleFileRestart,
+        DoubleFileRestart,
+        NotPacing,
     };
 
-    public enum irsdk_TrackWetness
+    public enum TrackWetness
     {
-        irsdk_TrackWetness_UNKNOWN = 0,
-        irsdk_TrackWetness_Dry,
-        irsdk_TrackWetness_MostlyDry,
-        irsdk_TrackWetness_VeryLightlyWet,
-        irsdk_TrackWetness_LightlyWet,
-        irsdk_TrackWetness_ModeratelyWet,
-        irsdk_TrackWetness_VeryWet,
-        irsdk_TrackWetness_ExtremelyWet
+        Unknown = 0,
+        Dry,
+        MostlyDry,
+        VeryLightlyWet,
+        LightlyWet,
+        ModeratelyWet,
+        VeryWet,
+        ExtremelyWet
     };
 }

@@ -1,12 +1,12 @@
 /**
  * Copyright (C)2024 Scott Velez
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -39,7 +39,7 @@ namespace LocationAndWarnings
 
             logger.LogInformation("processing data from \"{source}\"", ibtOptions == null ? "online LIVE session" : "offline IBT file");
 
-            // create telemetry client 
+            // create telemetry client
             using var tc = TelemetryClient<TelemetryData>.Create(logger, ibtOptions);
 
             // subscribe to telemetry updates
@@ -68,10 +68,10 @@ namespace LocationAndWarnings
                 logger.LogInformation(message);
             }
 
-            string GetEngineWarnings(irsdk_EngineWarnings engineWarnings)
+            string GetEngineWarnings(EngineWarnings engineWarnings)
             {
                 var warnings = new List<string>();
-                foreach (var flag in Enum.GetValues<irsdk_EngineWarnings>())
+                foreach (var flag in Enum.GetValues<EngineWarnings>())
                 {
                     // check if the flag is set
                     if (engineWarnings.HasFlag(flag))

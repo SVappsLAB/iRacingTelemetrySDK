@@ -168,17 +168,16 @@ namespace SVappsLAB.iRacingTelemetrySDK
         {
             var type = varName switch
             {
-                // specific enums
-                "CarIdxTrackSurface" => length == 1 ? typeof(irsdk_TrkLoc) : typeof(irsdk_TrkLoc[]),
-                "CarIdxTrackSurfaceMaterial" => length == 1 ? typeof(irsdk_TrkSurf) : typeof(irsdk_TrkSurf[]),
-                "CarLeftRight" => length == 1 ? typeof(irsdk_CarLeftRight) : typeof(irsdk_CarLeftRight[]),
-                "PaceMode" => length == 1 ? typeof(irsdk_PaceMode) : typeof(irsdk_PaceMode[]),
-                "PlayerCarPitSvStatus" => length == 1 ? typeof(irsdk_PitSvStatus) : typeof(irsdk_PitSvStatus[]),
-                "PlayerTrackSurface" => length == 1 ? typeof(irsdk_TrkLoc) : typeof(irsdk_TrkLoc[]),
-                "PlayerTrackSurfaceMaterial" => length == 1 ? typeof(irsdk_TrkSurf) : typeof(irsdk_TrkSurf[]),
-                "SessionState" => length == 1 ? typeof(irsdk_SessionState) : typeof(irsdk_SessionState[]),
-                "TrackWetness" => length == 1 ? typeof(irsdk_TrackWetness) : typeof(irsdk_TrackWetness[]),
-                // otherwise int
+                "CarIdxTrackSurface" => length == 1 ? typeof(TrackLocation) : typeof(TrackLocation[]),
+                "CarIdxTrackSurfaceMaterial" => length == 1 ? typeof(TrackSurface) : typeof(TrackSurface[]),
+                "CarLeftRight" => length == 1 ? typeof(CarLeftRight) : typeof(CarLeftRight[]),
+                "PaceMode" => length == 1 ? typeof(PaceMode) : typeof(PaceMode[]),
+                "PlayerCarPitSvStatus" => length == 1 ? typeof(PitServiceStatus) : typeof(PitServiceStatus[]),
+                "PlayerTrackSurface" => length == 1 ? typeof(TrackLocation) : typeof(TrackLocation[]),
+                "PlayerTrackSurfaceMaterial" => length == 1 ? typeof(TrackSurface) : typeof(TrackSurface[]),
+                "SessionState" => length == 1 ? typeof(SessionState) : typeof(SessionState[]),
+                "TrackWetness" => length == 1 ? typeof(TrackWetness) : typeof(TrackWetness[]),
+                // default to int
                 _ => length == 1 ? typeof(int) : typeof(int[]),
             };
             return type;
@@ -187,12 +186,12 @@ namespace SVappsLAB.iRacingTelemetrySDK
         {
             var type = varName switch
             {
-                "CamCameraState" => length == 1 ? typeof(irsdk_CameraState) : typeof(irsdk_CameraState[]),
-                "CarIdxPaceFlags" => length == 1 ? typeof(irsdk_PaceFlags) : typeof(irsdk_PaceFlags[]),
-                "CarIdxSessionFlags" => length == 1 ? typeof(irsdk_Flags) : typeof(irsdk_Flags[]),
-                "EngineWarnings" => length == 1 ? typeof(irsdk_EngineWarnings) : typeof(irsdk_EngineWarnings[]),
-                "PitServiceFlags" => length == 1 ? typeof(irsdk_PitSvStatus) : typeof(irsdk_PitSvStatus[]),
-                "SessionFlags" => length == 1 ? typeof(irsdk_Flags) : typeof(irsdk_Flags[]),
+                "CamCameraState" => length == 1 ? typeof(CameraState) : typeof(CameraState[]),
+                "CarIdxPaceFlags" => length == 1 ? typeof(PaceFlags) : typeof(TrackSurface[]),
+                "CarIdxSessionFlags" => length == 1 ? typeof(SessionFlags) : typeof(SessionFlags[]),
+                "EngineWarnings" => length == 1 ? typeof(EngineWarnings) : typeof(EngineWarnings[]),
+                "PitServiceFlags" => length == 1 ? typeof(PitServiceStatus) : typeof(PitServiceStatus[]),
+                "SessionFlags" => length == 1 ? typeof(SessionFlags) : typeof(SessionFlags[]),
                 _ => throw new NotImplementedException(varName)
             };
             return type;
