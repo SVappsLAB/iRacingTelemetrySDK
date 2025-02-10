@@ -1,12 +1,12 @@
 /**
  * Copyright (C)2024 Scott Velez
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -46,7 +46,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
                     {
                         _vars = vars;
                     }
-                } 
+                }
             }";
 
         static iRacingVars _iRacingData = new iRacingVars();
@@ -93,8 +93,8 @@ namespace SVappsLAB.iRacingTelemetrySDK
                     {
                         0 => varItem.Length == 1 ? typeof(byte) : typeof(byte[]),
                         1 => varItem.Length == 1 ? typeof(bool) : typeof(bool[]),
-                        2 => GetIntOrEnumType(rawVariableName, varItem.Length),
-                        3 => varItem.Length == 1 ? typeof(int) : typeof(int[]),
+                        2 => GetIntOrEnumType(varItem.Name, varItem.Length),
+                        3 => GetFlagType(varItem.Name, varItem.Length),
                         4 => varItem.Length == 1 ? typeof(float) : typeof(float[]),
                         5 => varItem.Length == 1 ? typeof(double) : typeof(double[]),
                         _ => throw new NotImplementedException(),
@@ -168,6 +168,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
         {
             var type = varName switch
             {
+                // specific enums
                 "CarIdxTrackSurface" => length == 1 ? typeof(irsdk_TrkLoc) : typeof(irsdk_TrkLoc[]),
                 "CarIdxTrackSurfaceMaterial" => length == 1 ? typeof(irsdk_TrkSurf) : typeof(irsdk_TrkSurf[]),
                 "CarLeftRight" => length == 1 ? typeof(irsdk_CarLeftRight) : typeof(irsdk_CarLeftRight[]),
@@ -177,11 +178,26 @@ namespace SVappsLAB.iRacingTelemetrySDK
                 "PlayerTrackSurfaceMaterial" => length == 1 ? typeof(irsdk_TrkSurf) : typeof(irsdk_TrkSurf[]),
                 "SessionState" => length == 1 ? typeof(irsdk_SessionState) : typeof(irsdk_SessionState[]),
                 "TrackWetness" => length == 1 ? typeof(irsdk_TrackWetness) : typeof(irsdk_TrackWetness[]),
-                // default to int
+                // otherwise int
                 _ => length == 1 ? typeof(int) : typeof(int[]),
             };
             return type;
         }
+        private Type GetFlagType(string varName, int length)
+        {
+            var type = varName switch
+            {
+                "CamCameraState" => length == 1 ? typeof(irsdk_CameraState) : typeof(irsdk_CameraState[]),
+                "CarIdxPaceFlags" => length == 1 ? typeof(irsdk_PaceFlags) : typeof(irsdk_PaceFlags[]),
+                "CarIdxSessionFlags" => length == 1 ? typeof(irsdk_Flags) : typeof(irsdk_Flags[]),
+                "EngineWarnings" => length == 1 ? typeof(irsdk_EngineWarnings) : typeof(irsdk_EngineWarnings[]),
+                "PitServiceFlags" => length == 1 ? typeof(irsdk_PitSvStatus) : typeof(irsdk_PitSvStatus[]),
+                "SessionFlags" => length == 1 ? typeof(irsdk_Flags) : typeof(irsdk_Flags[]),
+                _ => throw new NotImplementedException(varName)
+            };
+            return type;
+        }
+
     }
 
 }

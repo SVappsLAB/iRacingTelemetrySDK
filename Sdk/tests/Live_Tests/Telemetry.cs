@@ -80,7 +80,7 @@ namespace Live_Tests
             telemetryClient.OnTelemetryUpdate += onNewTelemetryData;
 
             // telemetry data we expect to receive
-            var engineWarnings = 0;
+            irsdk_EngineWarnings engineWarnings = 0;
             var isOnTrackCar = false;
             irsdk_TrkLoc playerTrackSurface = irsdk_TrkLoc.irsdk_NotInWorld;
             var rpm = 0.0f;

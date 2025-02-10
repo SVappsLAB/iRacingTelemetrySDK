@@ -16,7 +16,6 @@
 
 using Microsoft.Extensions.Logging;
 using SVappsLAB.iRacingTelemetrySDK;
-using SVappsLAB.iRacingTelemetrySDK.Flags;
 
 namespace LocationAndWarnings
 {
@@ -58,11 +57,11 @@ namespace LocationAndWarnings
                     return;
 
                 // figure out where the car is, and what the track surface is
-                var trackSurface = Enum.GetName(typeof(irsdk_TrkLoc), e.PlayerTrackSurface);
-                var trackSurfaceMaterial = Enum.GetName(typeof(irsdk_TrkSurf), e.PlayerTrackSurfaceMaterial);
+                var trackSurface = Enum.GetName(e.PlayerTrackSurface);
+                var trackSurfaceMaterial = Enum.GetName(e.PlayerTrackSurfaceMaterial);
 
                 // engine warnings
-                var engineWarnings = GetEngineWarnings((irsdk_EngineWarnings)e.EngineWarnings);
+                var engineWarnings = GetEngineWarnings(e.EngineWarnings);
 
                 //  EngineWarnings,Boolean IsOnTrack,Int32 PlayerTrackSurface,Int32 PlayerTrackSurfaceMaterial,Int32 TrackWetness);
                 var message = $"OnTrack:({e.IsOnTrack}), TrackSurface:({trackSurface}), TrackSurfaceMaterial:({trackSurfaceMaterial}), EngineWarnings:({engineWarnings})";
@@ -77,7 +76,7 @@ namespace LocationAndWarnings
                     // check if the flag is set
                     if (engineWarnings.HasFlag(flag))
                     {
-                        var flagName = Enum.GetName(typeof(irsdk_EngineWarnings), flag);
+                        var flagName = Enum.GetName(flag);
                         if (!string.IsNullOrEmpty(flagName))
                             warnings.Add(flagName);
                     }

@@ -32,7 +32,7 @@ namespace SpeedRPMGear
                     .CreateLogger("logger");
 
             // if you pass in a IBT filename, we'll use that, otherwise default to LIVE mode
-            IBTOptions ibtOptions = null;
+            IBTOptions? ibtOptions = null;
             if (args.Length == 1)
                 ibtOptions = new IBTOptions(args[0]);
 
