@@ -15,7 +15,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IBT_Tests", "tests\IBT_Test
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Live_Tests", "tests\Live_Tests\Live_Tests.csproj", "{42A7E161-8B51-4D06-9FEF-2430A6E27567}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SVappsLAB.iRacingTelemetrySDK.Enums", "SVappsLAB.iRacingTelemetrySDK.Enums\SVappsLAB.iRacingTelemetrySDK.Enums.csproj", "{33B96CF1-348F-4143-BD67-CB842762B07B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SVappsLAB.iRacingTelemetrySDK.EnumsAndFlags", "SVappsLAB.iRacingTelemetrySDK.EnumsAndFlags\SVappsLAB.iRacingTelemetrySDK.EnumsAndFlags.csproj", "{33B96CF1-348F-4143-BD67-CB842762B07B}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Extras", "Extras", "{09B1AB62-FEF3-472D-BD82-C02514C84177}"
 	ProjectSection(SolutionItems) = preProject

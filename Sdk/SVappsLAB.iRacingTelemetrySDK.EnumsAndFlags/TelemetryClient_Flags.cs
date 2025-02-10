@@ -17,7 +17,7 @@
 using System;
 
 // bit fields
-namespace SVappsLAB.iRacingTelemetrySDK.Flags
+namespace SVappsLAB.iRacingTelemetrySDK
 {
     [Flags]
     public enum irsdk_EngineWarnings

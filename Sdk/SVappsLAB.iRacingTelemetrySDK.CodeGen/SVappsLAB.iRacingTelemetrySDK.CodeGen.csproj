@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\SVappsLAB.iRacingTelemetrySDK.Enums\SVappsLAB.iRacingTelemetrySDK.Enums.csproj" PrivateAssets="all"/>
+    <ProjectReference Include="..\SVappsLAB.iRacingTelemetrySDK.EnumsAndFlags\SVappsLAB.iRacingTelemetrySDK.EnumsAndFlags.csproj" PrivateAssets="all" />
   </ItemGroup>
 
 
