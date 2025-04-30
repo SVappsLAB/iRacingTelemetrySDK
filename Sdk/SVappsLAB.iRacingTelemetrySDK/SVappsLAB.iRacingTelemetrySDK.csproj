@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<TargetFramework>net8.0</TargetFramework>
@@ -35,7 +35,7 @@
 		<PackageTags>iRacing iRacingSDK irsdk IBT Telemetry SDK API</PackageTags>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PackageLicenseFile>LICENSE</PackageLicenseFile>
-		<Version>0.9.0</Version>
+		<Version>0.9.1</Version>
 		<Authors>Scott Velez</Authors>
 		<Company>SVappsLAB</Company>
 		<Copyright>Copyright (c) 2025 SVappsLAB</Copyright>

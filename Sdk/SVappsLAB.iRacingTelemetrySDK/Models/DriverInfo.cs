@@ -49,6 +49,7 @@ namespace SVappsLAB.iRacingTelemetrySDK.Models
         public string DriverSetupLoadTypeName { get; set; }
         public int DriverSetupPassedTech { get; set; }
         public int DriverIncidentCount { get; set; }
+        public float DriverBrakeCurvingFactor { get; set; }
         public List<Driver> Drivers { get; set; }
 
     }
