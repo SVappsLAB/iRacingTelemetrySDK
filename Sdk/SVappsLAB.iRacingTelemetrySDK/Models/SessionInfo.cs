@@ -21,6 +21,7 @@ namespace SVappsLAB.iRacingTelemetrySDK.Models
 {
     public class SessionInfo
     {
+        public int CurrentSessionNum { get; set; }
         public List<Session> Sessions { get; set; }
 
     }

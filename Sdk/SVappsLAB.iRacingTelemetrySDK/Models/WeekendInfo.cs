@@ -29,6 +29,7 @@ namespace SVappsLAB.iRacingTelemetrySDK.Models
         public string TrackDisplayShortName { get; set; } // Spa
         public string TrackConfigName { get; set; } // Grand Prix Pit
         public string TrackCity { get; set; } // Francorchamps
+        public string TrackState { get; set; } // MA - Maine
         public string TrackCountry { get; set; } // Belgium
         public string TrackAltitude { get; set; } // 414.45 m
         public string TrackLatitude { get; set; } // 50.444061 m
@@ -36,13 +37,17 @@ namespace SVappsLAB.iRacingTelemetrySDK.Models
         public string TrackNorthOffset { get; set; } // 5.8076 rad
         public int TrackNumTurns { get; set; }
         public string TrackPitSpeedLimit { get; set; } // 60.00 kph
+        public string TrackPaceSpeed { get; set; } // 60.00 kph
+        public string TrackNumPitStalls { get; set; } // 1
         public string TrackType { get; set; } // road course
         public string TrackDirection { get; set; } // neutral
         public string TrackWeatherType { get; set; } // Generated / Dynamic Sky
         public string TrackSkies { get; set; } // Partly Cloudy
         public string TrackSurfaceTemp { get; set; } // 32.53 C
+        public string TrackSurfaceTempCrew { get; set; } // 32.53 C
         public string TrackAirTemp { get; set; } // 18.28 C
         public string TrackAirPressure { get; set; } // 28.48 Hg
+        public string TrackAirDensity { get; set; } // 1.13 kg/m^3
         public string TrackWindVel { get; set; } // 1.15 m/s
         public string TrackWindDir { get; set; } // 4.10 rad
         public string TrackRelativeHumidity { get; set; } // 53 %
