@@ -1,5 +1,5 @@
 /**
- * Copyright (C)2024 Scott Velez
+ * Copyright (C) 2024-2025 Scott Velez
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,10 +16,11 @@
 
 using System;
 using System.Runtime.InteropServices;
+using SVappsLAB.iRacingTelemetrySDK.DataProviders;
 
 namespace SVappsLAB.iRacingTelemetrySDK.irSDKDefines
 {
-    static internal class Constants
+    internal static class Constants
     {
         public const int IRSDK_MAX_BUFS = 4;
         public const int IRSDK_MAX_STRING = 32;
