@@ -1,5 +1,5 @@
 /**
- * Copyright (C)2024 Scott Velez
+ * Copyright (C) 2024-2025 Scott Velez
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using SVappsLAB.iRacingTelemetrySDK.IBTPlayback;
+using SVappsLAB.iRacingTelemetrySDK.DataProviders;
 using SVappsLAB.iRacingTelemetrySDK.irSDKDefines;
 using SVappsLAB.iRacingTelemetrySDK.Models;
 
@@ -113,11 +113,10 @@ namespace SVappsLAB.iRacingTelemetrySDK
 
         bool _isInitialized = false;
 
-        int _currentRecord = 0;
         IBTOptions? _ibtOptions;
         string? _rawSessionInfoYaml;
 
-        irSDKMemoryAccessProvider _irSDKMemoryProvider;
+        IDataProvider _dataProvider;
         private System.Reflection.ConstructorInfo _telemetryDataConstructorInfo;
         private IEnumerable<System.Reflection.ParameterInfo> _telemetryDataConstructorParameters;
 
@@ -137,7 +136,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
             _logger = logger;
             _ibtOptions = ibtOptions;
 
-            _irSDKMemoryProvider = new irSDKMemoryAccessProvider(_logger);
+            _dataProvider = _ibtOptions == null ? new LiveDataProvider(_logger) : new IBTDataProvider(_logger, _ibtOptions);
 
             // get constructor and parameters of the TelemetryData type
             // we'll need them later when we create instances of the type
@@ -164,7 +163,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
             unsafe IEnumerable<TelemetryVariable> unsafeInternal()
             {
                 var list = new List<TelemetryVariable>();
-                foreach (var vh in _irSDKMemoryProvider.GetVarHeaders()!.Values)
+                foreach (var vh in _dataProvider.GetVarHeaders()!.Values)
                 {
                     var tVar = new TelemetryVariable
                     {
@@ -181,9 +180,9 @@ namespace SVappsLAB.iRacingTelemetrySDK
 
                         Length = vh.count,
                         IsTimeValue = vh.countAsTime,
-                        Name = Marshal.PtrToStringAnsi((IntPtr)vh.name) ?? string.Empty,
-                        Desc = Marshal.PtrToStringAnsi((IntPtr)vh.desc) ?? string.Empty,
-                        Units = Marshal.PtrToStringAnsi((IntPtr)vh.unit) ?? string.Empty,
+                        Name = Marshal.PtrToStringAnsi((nint)vh.name) ?? string.Empty,
+                        Desc = Marshal.PtrToStringAnsi((nint)vh.desc) ?? string.Empty,
+                        Units = Marshal.PtrToStringAnsi((nint)vh.unit) ?? string.Empty,
                     };
                     list.Add(tVar);
                 }
@@ -196,13 +195,13 @@ namespace SVappsLAB.iRacingTelemetrySDK
 
         public string GetRawTelemetrySessionInfoYaml()
         {
-            return _irSDKMemoryProvider.GetSessionInfoYaml();
+            return _dataProvider.GetSessionInfoYaml();
         }
         public bool IsConnected()
         {
             if (_isInitialized)
             {
-                var isConnected = _irSDKMemoryProvider.IsConnected;
+                var isConnected = _dataProvider.IsConnected;
                 return isConnected;
             }
             return false;
@@ -221,9 +220,9 @@ namespace SVappsLAB.iRacingTelemetrySDK
 
                 //Uninitialize();
 
-                if (_irSDKMemoryProvider != null)
+                if (_dataProvider != null)
                 {
-                    _irSDKMemoryProvider.Dispose();
+                    _dataProvider.Dispose();
                 }
             }
             catch (Exception e)
@@ -256,7 +255,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
 
             try
             {
-                _rawSessionInfoYaml = _irSDKMemoryProvider.GetSessionInfoYaml();
+                _rawSessionInfoYaml = _dataProvider.GetSessionInfoYaml();
 
                 var parseResult = _sessionInfoParser.Parse<TelemetrySessionInfo>(_rawSessionInfoYaml);
                 var sessionTelemetryInfo = parseResult.Model;
@@ -277,7 +276,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
         {
             try
             {
-                _irSDKMemoryProvider.OpenDataSource();
+                _dataProvider.OpenDataSource();
                 _isInitialized = true;
             }
             catch (FileNotFoundException)
@@ -323,7 +322,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
             }
 
             // check connection
-            var isConnected = _irSDKMemoryProvider.IsConnected;
+            var isConnected = _dataProvider.IsConnected;
 
             // if connection state changed, send event
             if (isConnected != _lastConnectionStatus)
@@ -344,7 +343,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
             }
 
             // if new session info, send event 
-            if (_irSDKMemoryProvider.IsSessionInfoUpdated())
+            if (_dataProvider.IsSessionInfoUpdated())
             {
                 if (OnSessionInfoUpdate != null)
                 {
@@ -357,7 +356,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
             }
 
             // wait for new telemetry data
-            var signaled = _irSDKMemoryProvider.WaitForDataReady(TimeSpan.FromMilliseconds(DATA_READY_TIMEOUT_MS));
+            var signaled = _dataProvider.WaitForDataReady(TimeSpan.FromMilliseconds(DATA_READY_TIMEOUT_MS));
             if (!signaled)
             {
                 // no new data, return and try again
@@ -378,7 +377,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
             var parameterValues = _telemetryDataConstructorParameters
                 .Select(p =>
                 {
-                    var val = _irSDKMemoryProvider.GetVarValue(p.Name!);
+                    var val = _dataProvider.GetVarValue(p.Name!);
                     return val;
                 });
             var telemetryData = (T)_telemetryDataConstructorInfo.Invoke(parameterValues.ToArray());
@@ -387,22 +386,19 @@ namespace SVappsLAB.iRacingTelemetrySDK
         private async Task<int> ProcessIbtData(CancellationToken token)
         {
             int numRecords = 0;
-            IPlaybackGovernor governor;
 
             try
             {
                 var sw = new Stopwatch();
                 sw.Start();
 
-                _irSDKMemoryProvider.OpenDataSource(_ibtOptions!.IbtFilePath);
-
-                numRecords = _irSDKMemoryProvider.GetNumRecordsInIBTFile();
+                _dataProvider.OpenDataSource();
 
                 // send connect event
                 OnConnectStateChanged?.Invoke(this, new ConnectStateChangedEventArgs { State = ConnectState.Connected });
 
                 // update and send session info event
-                if (_irSDKMemoryProvider.IsSessionInfoUpdated())
+                if (_dataProvider.IsSessionInfoUpdated())
                 {
                     if (OnSessionInfoUpdate != null)
                     {
@@ -410,13 +406,14 @@ namespace SVappsLAB.iRacingTelemetrySDK
                     }
                 }
 
-                governor = new SimpleGovernor(_logger, _ibtOptions!.PlayBackSpeedMultiplier);
-                governor.StartPlayback();
-
                 // loop until we are at eof or cancelled
-                for (_currentRecord = 0; _currentRecord < numRecords && !token.IsCancellationRequested; _currentRecord++)
+                for (numRecords = 0; !token.IsCancellationRequested; numRecords++)
                 {
-                    _irSDKMemoryProvider.WaitForDataReady(_currentRecord);
+                    var dataAvailable = _dataProvider.WaitForDataReady(TimeSpan.Zero);
+                    if (!dataAvailable)
+                    {
+                        break;
+                    }
 
                     // send event if we have a listener
                     if (OnTelemetryUpdate != null)
@@ -424,15 +421,12 @@ namespace SVappsLAB.iRacingTelemetrySDK
                         var telemetryData = GetTelemetryDataSample();
                         OnTelemetryUpdate.Invoke(this, telemetryData);
                     }
-
-                    // throttle playback speed
-                    await governor.GovernSpeed(_currentRecord);
                 }
 
                 sw.Stop();
                 var recsPerSec = Math.Round(numRecords / sw.ElapsedMilliseconds * 1000f, 1);
                 var minsOfData = Math.Round(numRecords / 60f / 60f);
-                _logger.LogInformation("processed {numRecords} IBT telemetry records ({minsOfData} mins worth of session data), in {milliseconds}ms. ({rate} recs/sec)", _currentRecord, minsOfData, sw.ElapsedMilliseconds, recsPerSec);
+                _logger.LogInformation("processed {_numRecords} IBT telemetry records ({minsOfData} mins worth of session data), in {milliseconds}ms. ({rate} recs/sec)", numRecords, minsOfData, sw.ElapsedMilliseconds, recsPerSec);
             }
             catch (Exception e)
             {

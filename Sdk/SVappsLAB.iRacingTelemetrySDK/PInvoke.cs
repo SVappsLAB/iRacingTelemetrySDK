@@ -1,5 +1,5 @@
 /**
- * Copyright (C)2024 Scott Velez
+ * Copyright (C) 2024-2025 Scott Velez
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,9 +22,9 @@ namespace SVappsLAB.iRacingTelemetrySDK
     internal class PInvoke
     {
         [DllImport("kernel32.dll", SetLastError = true)]
-        public static extern IntPtr OpenEvent(uint dwDesiredAccess, bool bInheritHandle, string lpName);
+        public static extern nint OpenEvent(uint dwDesiredAccess, bool bInheritHandle, string lpName);
 
         [DllImport("kernel32.dll")]
-        public static extern bool CloseHandle(IntPtr hObject);
+        public static extern bool CloseHandle(nint hObject);
     }
 }

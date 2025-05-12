@@ -1,5 +1,5 @@
 /**
- * Copyright (C)2024 Scott Velez
+ * Copyright (C) 2024-2025 Scott Velez
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,15 +16,13 @@
 
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.IO.MemoryMappedFiles;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Threading;
 using Microsoft.Extensions.Logging;
 using SVappsLAB.iRacingTelemetrySDK.irSDKDefines;
 
-namespace SVappsLAB.iRacingTelemetrySDK
+namespace SVappsLAB.iRacingTelemetrySDK.DataProviders
 {
     internal enum irsdk_StatusField
     {
@@ -39,32 +37,25 @@ namespace SVappsLAB.iRacingTelemetrySDK
         {
         }
     }
-    internal unsafe class irSDKMemoryAccessProvider : IDisposable
-    {
-        const string IRSDK_MemMapFileName = @"Local\IRSDKMemMapFileName";
-        const string IRSDK_DataValidEventName = @"Local\IRSDKDataValidEvent";
-        const int SYNCHRONIZE_ACCESS = 0x00100000;
 
-        ILogger _logger;
-        string? _ibtFileName;
+    internal abstract unsafe class DataProviderBase : IDisposable
+    {
+
+        protected ILogger _logger;
         byte[]? _telemetryDataBuffer;
-        byte* _dataPtr;
-        irsdk_header _header;
+        protected byte* _dataPtr;
+        protected irsdk_header _header;
         int _oldVarBufLen;
         VarHeaderDictionary? _varHeaders;
-        int _lastTickCount = 0; // latest tick count iRacing wrote to
         int _lastSessionInfoUpdate = -1; // latest session info update counter
 
-        int _dataDropCount = 0;
-        DateTime _lastDropTime = DateTime.MinValue;
+        protected MemoryMappedFile? _mmFile;
+        protected MemoryMappedViewAccessor? _viewAccessor;
 
-        MemoryMappedFile? _mmFile;
-        MemoryMappedViewAccessor? _viewAccessor;
-        AutoResetEvent? _dataReadyEvent;
-
-        public irSDKMemoryAccessProvider(ILogger logger)
+        public DataProviderBase(ILogger logger)
         {
             _logger = logger;
+            _logger.LogInformation($"Initializing {GetType().Name}.");
         }
         public void Dispose()
         {
@@ -74,33 +65,8 @@ namespace SVappsLAB.iRacingTelemetrySDK
 
         public void OpenDataSource(string ibtFilename)
         {
-            _ibtFileName = ibtFilename;
-
-            // explicitly open in shared mode so multiple processes (or tests) can access the same file
-            _mmFile = MemoryMappedFile.CreateFromFile(_ibtFileName, FileMode.Open, null, 0, MemoryMappedFileAccess.Read);
-            _viewAccessor = _mmFile.CreateViewAccessor(0, 0, MemoryMappedFileAccess.Read);
-            _viewAccessor!.SafeMemoryMappedViewHandle.AcquirePointer(ref _dataPtr);
-
-            // read header 
-            _header = GetHeader();
         }
-        public void OpenDataSource()
-        {
-            _mmFile = MemoryMappedFile.OpenExisting(IRSDK_MemMapFileName);
-            _viewAccessor = _mmFile.CreateViewAccessor();
-            _viewAccessor!.SafeMemoryMappedViewHandle.AcquirePointer(ref _dataPtr);
-
-            // read header 
-            _header = GetHeader();
-
-            // data ready event
-            var rawEvent = PInvoke.OpenEvent(SYNCHRONIZE_ACCESS, false, IRSDK_DataValidEventName);
-            _dataReadyEvent = new AutoResetEvent(false) { SafeWaitHandle = new Microsoft.Win32.SafeHandles.SafeWaitHandle(rawEvent, true) };
-        }
-        public void initCommon()
-        {
-            _viewAccessor!.SafeMemoryMappedViewHandle.AcquirePointer(ref _dataPtr);
-        }
+        public abstract void OpenDataSource();
         public bool IsConnected => (GetHeader().status & irsdk_StatusField.irsdk_stConnected) > 0;
         public bool IsSessionInfoUpdated()
         {
@@ -156,13 +122,8 @@ namespace SVappsLAB.iRacingTelemetrySDK
             }
 
             // convert buffer (from 'offSet' to 'len') to a string
-            var sessInfo = Marshal.PtrToStringAnsi(new IntPtr(_dataPtr + GetHeader().sessionInfoOffset), len);
+            var sessInfo = Marshal.PtrToStringAnsi(new nint(_dataPtr + GetHeader().sessionInfoOffset), len);
             return sessInfo;
-        }
-        public int GetNumRecordsInIBTFile()
-        {
-            var numRecs = GetDiskSubHeader().sessionRecordCount;
-            return numRecs;
         }
 
         public object GetVarValue(string varName)
@@ -183,12 +144,10 @@ namespace SVappsLAB.iRacingTelemetrySDK
                         if (vh.count == 1)
                         {
                             // read the byte value at the offset
-                            //val = Marshal.ReadByte(new IntPtr(offset));
                             val = rosBuffer[vh.offset];
                         }
                         else
                         {
-                            //val = Marshal.PtrToStringAnsi(new IntPtr(offset));
                             val = Encoding.ASCII.GetString(_telemetryDataBuffer!, vh.offset, vh.count);
                         }
                     }
@@ -222,97 +181,26 @@ namespace SVappsLAB.iRacingTelemetrySDK
         }
 
         // wait for iRacing to signal there is new data
-        public bool WaitForDataReady(TimeSpan timeSpan)
-        {
-            var signaled = _dataReadyEvent!.WaitOne(timeSpan);
-            if (!signaled)
-            {
-                _logger.LogDebug("timeout waiting for data ready event");
-                return false;
-            }
+        public abstract bool WaitForDataReady(TimeSpan timeSpan);
 
-            var latestTickCount = GetLatestVarBuff().tickCount;
-
-            // if we missed any telemetry data, log that it happened
-            if (latestTickCount > _lastTickCount)
-            {
-                var tickDiff = latestTickCount - _lastTickCount - 1;
-                if (_lastTickCount != 0 && tickDiff > 0)
-                {
-                    _dataDropCount += tickDiff;
-                    _logger.LogWarning("dropped {count} data records. {total} total", tickDiff, _dataDropCount);
-                }
-            }
-
-            // did we loose sync?  perhaps we disconnected or a new session started
-            // log that it happened. we will resync below
-            if (latestTickCount < _lastTickCount)
-            {
-                _logger.LogDebug("new data is older than our last sample. lost connection?  will resync");
-            }
-
-            // copy new data to the access buffer for later reading
-            CopyNewTelemetryDataToBuffer();
-            // resync - update our last tick count
-            _lastTickCount = latestTickCount;
-
-            return true;
-        }
-
-        // this is called by the IBT file processor
-        // rather than waiting for live data, we just copy the specified data record to the buffer
-        public bool WaitForDataReady(int recNum)
-        {
-            CopyNewTelemetryDataToBuffer(recNum);
-            return true;
-        }
-        internal VarHeaderDictionary? GetVarHeaders()
+        public VarHeaderDictionary? GetVarHeaders()
         {
             return _varHeaders;
         }
-        irsdk_varBuf GetLatestVarBuff()
-        {
-            var header = GetHeader();
 
-            var vb = header.varBuf1;
-            if (header.varBuf2.tickCount > vb.tickCount)
-                vb = header.varBuf2;
-            if (header.varBuf3.tickCount > vb.tickCount)
-                vb = header.varBuf3;
-            if (header.varBuf4.tickCount > vb.tickCount)
-                vb = header.varBuf4;
-            return vb;
-
-        }
-        irsdk_diskSubHeader GetDiskSubHeader()
-        {
-            // the disksubheader is located after the header
-            var offset = sizeof(irsdk_header);
-
-            var ros = new ReadOnlySpan<byte>(_dataPtr + offset, sizeof(irsdk_diskSubHeader));
-            var diskSubHeader = MemoryMarshal.AsRef<irsdk_diskSubHeader>(ros);
-
-            return diskSubHeader;
-        }
 
         // with IBT files, the 'recNum' tells us which data record in the mmf we should read
-        void CopyNewTelemetryDataToBuffer(int recNum = 0)
+        protected void CopyNewTelemetryDataToBuffer(int recNum = 0)
         {
-            var offset = _header.GetMostRecentBuffer().bufOffset + (recNum * _header.bufLen);
+            var offset = _header.GetMostRecentBuffer().bufOffset + recNum * _header.bufLen;
             var ros = new ReadOnlySpan<byte>(_dataPtr + offset, _header.bufLen);
             ros.CopyTo(_telemetryDataBuffer);
         }
 
         protected virtual void Dispose(bool disposing)
         {
-            // dispose managed resources
             if (disposing)
             {
-                if (_dataReadyEvent != null)
-                {
-                    _dataReadyEvent.Dispose();
-                    _dataReadyEvent = null;
-                }
                 if (_viewAccessor != null)
                 {
                     _viewAccessor.SafeMemoryMappedViewHandle.ReleasePointer();
@@ -326,7 +214,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
                 }
             }
         }
-        ~irSDKMemoryAccessProvider()
+        ~DataProviderBase()
         {
             Dispose(false);
         }
@@ -338,7 +226,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
             for (int i = 0; i < _header.numVars; i++)
             {
                 var vh = ros[i];
-                var name = Marshal.PtrToStringAnsi(new IntPtr(vh.name)) ?? String.Empty;
+                var name = Marshal.PtrToStringAnsi(new nint(vh.name)) ?? string.Empty;
 
                 dict.Add(name, vh);
             }
@@ -354,4 +242,6 @@ namespace SVappsLAB.iRacingTelemetrySDK
         }
 
     }
+
 }
+
