@@ -100,6 +100,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
         private const int INITIALIZATION_DELAY_MS = 1000;
 
         public event EventHandler<T>? OnTelemetryUpdate;
+        public event EventHandler<string>? OnRawSessionInfoUpdate;
         public event EventHandler<TelemetrySessionInfo>? OnSessionInfoUpdate;
         public event EventHandler<ExceptionEventArgs>? OnError;
         public event EventHandler<ConnectStateChangedEventArgs>? OnConnectStateChanged;
@@ -114,7 +115,6 @@ namespace SVappsLAB.iRacingTelemetrySDK
         bool _isInitialized = false;
 
         IBTOptions? _ibtOptions;
-        string? _rawSessionInfoYaml;
 
         IDataProvider _dataProvider;
         private System.Reflection.ConstructorInfo _telemetryDataConstructorInfo;
@@ -243,21 +243,19 @@ namespace SVappsLAB.iRacingTelemetrySDK
             Dispose(false);
         }
         private bool IsOnlineMode => _ibtOptions == null;
-        Task UpdateSession()
+        Task UpdateSession(string rawSessionInfoYaml)
         {
-            var task = Task.Run(() => UpdateSessionHelper());
+            var task = Task.Run(() => UpdateSessionHelper(rawSessionInfoYaml));
             return task;
         }
-        void UpdateSessionHelper()
+        void UpdateSessionHelper(string rawSessionInfoYaml)
         {
             var sw = new Stopwatch();
             sw.Start();
 
             try
             {
-                _rawSessionInfoYaml = _dataProvider.GetSessionInfoYaml();
-
-                var parseResult = _sessionInfoParser.Parse<TelemetrySessionInfo>(_rawSessionInfoYaml);
+                var parseResult = _sessionInfoParser.Parse<TelemetrySessionInfo>(rawSessionInfoYaml);
                 var sessionTelemetryInfo = parseResult.Model;
                 _logger.LogDebug("sessionInfo deserialize complete. required {attempts} attempts. ({elapsed}ms)", parseResult.ParseAttemptsRequired, sw.ElapsedMilliseconds);
 
@@ -345,13 +343,21 @@ namespace SVappsLAB.iRacingTelemetrySDK
             // if new session info, send event 
             if (_dataProvider.IsSessionInfoUpdated())
             {
+                var rawSessionInfoYaml = _dataProvider.GetSessionInfoYaml();
+
+                // if anyone wants raw yaml, send it
+                if (OnRawSessionInfoUpdate != null)
+                {
+                    OnRawSessionInfoUpdate.Invoke(this, rawSessionInfoYaml);
+                }
+
                 if (OnSessionInfoUpdate != null)
                 {
                     if (!_sessionInfoProcessingTask.IsCompleted)
                     {
                         _logger.LogWarning("sessionInfo processing task is still running");
                     }
-                    _sessionInfoProcessingTask = UpdateSession();
+                    _sessionInfoProcessingTask = UpdateSession(rawSessionInfoYaml);
                 }
             }
 
@@ -400,9 +406,14 @@ namespace SVappsLAB.iRacingTelemetrySDK
                 // update and send session info event
                 if (_dataProvider.IsSessionInfoUpdated())
                 {
+                    var rawSessionInfoYaml = _dataProvider.GetSessionInfoYaml();
+                    if (OnRawSessionInfoUpdate != null)
+                    {
+                        OnRawSessionInfoUpdate.Invoke(this, rawSessionInfoYaml);
+                    }
                     if (OnSessionInfoUpdate != null)
                     {
-                        await UpdateSession();
+                        await UpdateSession(rawSessionInfoYaml);
                     }
                 }
 

@@ -21,7 +21,7 @@ namespace SVappsLAB.iRacingTelemetrySDK.Models
 {
     public class TelemetrySessionInfo
     {
-        public WeekendInfo WeekendInfo;
+        public WeekendInfo WeekendInfo { get; set; }
         public SessionInfo SessionInfo { get; set; }
         public QualifyResultsInfo QualifyResultsInfo { get; set; }
         public CameraInfo CameraInfo { get; set; }
