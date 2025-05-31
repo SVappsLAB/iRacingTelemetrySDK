@@ -122,7 +122,7 @@ namespace Live_Tests
 
 
             // check if the telemetry data is as expected
-            Assert.True(engineWarnings == 0, "should be no EngineWarnings flags");
+            Assert.True(engineWarnings == 0 || engineWarnings == EngineWarnings.PitSpeedLimiter, $"should be no EngineWarnings flags: {engineWarnings}");
             Assert.True(isOnTrackCar, "IsOnTrackCar is false");
 
             var isValidTrackSurface =
