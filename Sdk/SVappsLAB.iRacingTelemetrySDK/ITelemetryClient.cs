@@ -34,7 +34,12 @@ namespace SVappsLAB.iRacingTelemetrySDK
         event EventHandler<ConnectStateChangedEventArgs> OnConnectStateChanged;
 
         /// <summary>
-        /// Event that is raised when the session info is updated.
+        /// Event that is raised when the raw session info is updated.
+        /// </summary>
+        event EventHandler<string> OnRawSessionInfoUpdate;
+
+        /// <summary>
+        /// Event that is raised when the session info model has been parsed.
         /// </summary>
         event EventHandler<TelemetrySessionInfo> OnSessionInfoUpdate;
 

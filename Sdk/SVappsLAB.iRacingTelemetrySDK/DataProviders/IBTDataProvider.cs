@@ -38,7 +38,10 @@ namespace SVappsLAB.iRacingTelemetrySDK.DataProviders
             {
                 throw new FileNotFoundException($"IBT file [{ibtOptions.IbtFilePath}] not found", ibtOptions.IbtFilePath);
             }
-
+            if (!ibtOptions.IbtFilePath.EndsWith(".ibt"))
+            {
+                throw new ArgumentException($"File [{ibtOptions.IbtFilePath}] is not an IBT file", ibtOptions.IbtFilePath);
+            }
             _ibtOptions = ibtOptions;
             _governor = new SimpleGovernor(_logger, _ibtOptions!.PlayBackSpeedMultiplier);
         }
