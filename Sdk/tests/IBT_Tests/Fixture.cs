@@ -23,7 +23,7 @@ namespace IBT_Tests
     [RequiredTelemetryVars(["IsOnTrackCar", "SessionTick", "EngineWarnings", "rpm", "SessionTimeRemain"])]
     public class Fixture : IAsyncLifetime
     {
-        CancellationTokenSource cts = new CancellationTokenSource();
+        const int TIMEOUT_SECS = 5;
         public TelemetrySessionInfo TelemetrySessionInfo { get; private set; } = default!;
         public ITelemetryClient<TelemetryData> TelemetryClient = default!;
         private string _ibtPath;
@@ -33,36 +33,39 @@ namespace IBT_Tests
             _ibtPath = ibtPath;
         }
 
-        public async Task InitializeAsync()
+        public async ValueTask InitializeAsync()
         {
-            var tcs = new TaskCompletionSource<bool>();
+            var delayTs = new CancellationTokenSource(TimeSpan.FromSeconds(TIMEOUT_SECS));
+
+            // cancel when either the test context is cancelled or after 5 seconds
+            var cts = CancellationTokenSource.CreateLinkedTokenSource(
+               TestContext.Current.CancellationToken,
+               delayTs.Token
+               );
 
             TelemetryClient = TelemetryClient<TelemetryData>.Create(NullLogger.Instance, new IBTOptions(_ibtPath));
             TelemetryClient.OnSessionInfoUpdate += (object? sender, TelemetrySessionInfo si) =>
             {
                 TelemetrySessionInfo = si;
 
-                //set flag that we are ready to run tests
-                tcs.SetResult(true);
-
-                // now that we have the sessionInfo, we can cancel monitoring the rest of the file
+                // now that we have the sessionInfo, we can cancel monitoring 
                 cts.Cancel();
             };
 
-            var task = TelemetryClient.Monitor(cts.Token);
+            await TelemetryClient.Monitor(cts.Token);
 
-            // monitoring has been cancelled. wait for monitor exit 
-            await task;
-
-            // wait for the signal that we have the sessioninfo
-            await tcs.Task;
+            // check if the timeout cancellation was requested
+            if (delayTs.IsCancellationRequested)
+            {
+                throw new Exception("timeout. unable to read session. cancelling the monitoring");
+            }
         }
 
-        public Task DisposeAsync()
+        public ValueTask DisposeAsync()
         {
             TelemetryClient.Dispose();
 
-            return Task.CompletedTask;
+            return ValueTask.CompletedTask;
         }
     }
 

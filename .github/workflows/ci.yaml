@@ -21,7 +21,8 @@ jobs:
       - name: build
         run: dotnet build --no-restore -c release
       - name: unit tests
-        run: dotnet test --no-restore -c release --filter UnitTests
+        run: dotnet run --no-restore -c release --project ./tests/UnitTests/UnitTests.csproj
+
     # can't run IBT tests with github runers - because we don't have
     # access to memory mapped files on the host
     # - name: ibt tests

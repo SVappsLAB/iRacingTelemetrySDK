@@ -22,7 +22,7 @@ namespace Live_Tests
 {
     public class Fixture : IAsyncLifetime
     {
-        CancellationTokenSource cts = new CancellationTokenSource();
+        const int TIMEOUT_SECS = 5;
         public ITelemetryClient<TelemetryData>? TelemetryClient;
         public TelemetrySessionInfo TelemetrySessionInfo { get; private set; }
 
@@ -30,46 +30,39 @@ namespace Live_Tests
         {
         }
 
-        public async Task InitializeAsync()
+        public async ValueTask InitializeAsync()
         {
-            var tcs = new TaskCompletionSource<bool>();
+            var delayTs = new CancellationTokenSource(TimeSpan.FromSeconds(TIMEOUT_SECS));
+
+            // cancel when either the test context is cancelled or after 5 seconds
+            var cts = CancellationTokenSource.CreateLinkedTokenSource(
+               TestContext.Current.CancellationToken,
+               delayTs.Token
+               );
 
             TelemetryClient = TelemetryClient<TelemetryData>.Create(NullLogger.Instance);
             TelemetryClient.OnSessionInfoUpdate += (object? sender, TelemetrySessionInfo si) =>
             {
                 TelemetrySessionInfo = si;
 
-                //set flag that we are ready to run tests
-                tcs.SetResult(true);
-
-                // now that we have the sessionInfo, we can cancel monitoring the rest of the file
+                // now that we have the sessionInfo, we can cancel monitoring 
                 cts.Cancel();
             };
 
-            // timeout that waits for 2 seconds
-            var timeoutTask = Task.Delay(2000);
+            await TelemetryClient.Monitor(cts.Token);
 
-            var monitoringTask = TelemetryClient.Monitor(cts.Token);
-
-            // check if the timeout monitoringTask completes before the existing monitoringTask
-            if (await Task.WhenAny(timeoutTask, monitoringTask) == timeoutTask)
+            // check if the timeout cancellation was requested
+            if (delayTs.IsCancellationRequested)
             {
-                //cts.Cancel();
-                throw new Exception("timeout. unable to connect to iRacing session. cancelling the monitoring");
+                throw new Exception("timeout. unable to read session. cancelling the monitoring");
             }
-
-            // monitoring has been cancelled. wait for monitor exit 
-            //await monitoringTask;
-
-            // wait for the signal that we have the sessioninfo
-            await tcs.Task;
         }
 
-        public Task DisposeAsync()
+        public ValueTask DisposeAsync()
         {
             TelemetryClient?.Dispose();
 
-            return Task.CompletedTask;
+            return ValueTask.CompletedTask;
         }
     }
 

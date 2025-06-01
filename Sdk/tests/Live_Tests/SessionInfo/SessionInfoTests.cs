@@ -67,7 +67,7 @@ namespace Live_Tests
             // RadioInfo
             Assert.True(si.RadioInfo.Radios.Count > 0);
             Assert.True(si.RadioInfo.Radios[0].NumFrequencies > 0);
-            Assert.True(si.RadioInfo.Radios[0].Frequencies.Exists(f => f.FrequencyName == "@CLUB"));
+            Assert.True(si.RadioInfo.Radios[0].Frequencies.Exists(f => f.FrequencyName == "@DRIVERS"));
 
             // DriverInfo
             Assert.True(si.DriverInfo.DriverCarIdleRPM > 0);

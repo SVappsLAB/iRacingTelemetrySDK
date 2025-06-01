@@ -49,7 +49,7 @@ namespace DumpVariables_DumpSessionInfo
             // create telemetry client  and subscribe
             using var tc = TelemetryClient<TelemetryData>.Create(logger, ibtOptions);
             tc.OnConnectStateChanged += OnConnectStateChanged;
-            tc.OnSessionInfoUpdate += OnSessionInfoUpdate;
+            tc.OnRawSessionInfoUpdate += OnRawSessionInfoUpdate;
 
             // startTime monitoring - exit when we receive the session info event 
             var monitorTask = tc.Monitor(cts.Token);
@@ -90,14 +90,14 @@ namespace DumpVariables_DumpSessionInfo
                 telemetryVariables = tc.GetTelemetryVariables().Result;
             }
 
-            // sessionInfo event handler
-            void OnSessionInfoUpdate(object? sender, TelemetrySessionInfo si)
+            // raw sessionInfo event handler
+            void OnRawSessionInfoUpdate(object? sender, string sessionInfoYaml)
             {
                 // if we already have the rawSessionInfoYaml, no more work to do
                 if (rawSessionInfoYaml != null)
                     return;
 
-                rawSessionInfoYaml = tc.GetRawTelemetrySessionInfoYaml();
+                rawSessionInfoYaml = sessionInfoYaml;
             }
 
             void writeVariablesFile(IEnumerable<TelemetryVariable> variables)
