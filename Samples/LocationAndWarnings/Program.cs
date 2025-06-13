@@ -30,7 +30,8 @@ namespace LocationAndWarnings
             var counter = 0;
             var logger = LoggerFactory
                     .Create(builder => builder
-                    .AddConsole().AddSimpleConsole(o => o.SingleLine = true))
+                    .SetMinimumLevel(LogLevel.Debug)
+                    .AddConsole())
                     .CreateLogger("logger");
 
             IBTOptions? ibtOptions = null;

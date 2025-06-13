@@ -28,7 +28,8 @@ namespace SpeedRPMGear
             var counter = 0;
             var logger = LoggerFactory
                     .Create(builder => builder
-                    .AddConsole().AddSimpleConsole(o => o.SingleLine = true))
+                    .SetMinimumLevel(LogLevel.Debug)
+                    .AddConsole())
                     .CreateLogger("logger");
 
             // if you pass in a IBT filename, we'll use that, otherwise default to LIVE mode

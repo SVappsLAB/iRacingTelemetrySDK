@@ -28,8 +28,8 @@ namespace SVappsLAB.iRacingTelemetrySDK.Models
 
     public class Group
     {
-        public int GroupNum { get; set; }
-        public string GroupName { get; set; }
+        public int GroupNum { get; set; } // 1
+        public string GroupName { get; set; } // "Nose"
         public bool IsScenic { get; set; } // Added for the Scenic group
         public List<Camera> Cameras { get; set; }
 
@@ -37,8 +37,8 @@ namespace SVappsLAB.iRacingTelemetrySDK.Models
 
     public class Camera
     {
-        public int CameraNum { get; set; }
-        public string CameraName { get; set; }
+        public int CameraNum { get; set; } // 1
+        public string CameraName { get; set; } // "CamNose"
 
     }
 }

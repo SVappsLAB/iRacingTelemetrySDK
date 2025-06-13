@@ -22,7 +22,7 @@ namespace SVappsLAB.iRacingTelemetrySDK.Models
     public class WeekendInfo
     {
         public string TrackName { get; set; } // spa up
-        public int TrackID { get; set; }
+        public int TrackID { get; set; } // 143
         public string TrackLength { get; set; } // 6.93 km
         public string TrackLengthOfficial { get; set; } // 7.00 km
         public string TrackDisplayName { get; set; } // Circuit de Spa-Francorchamps
@@ -35,10 +35,10 @@ namespace SVappsLAB.iRacingTelemetrySDK.Models
         public string TrackLatitude { get; set; } // 50.444061 m
         public string TrackLongitude { get; set; } // 5.965178 m
         public string TrackNorthOffset { get; set; } // 5.8076 rad
-        public int TrackNumTurns { get; set; }
+        public int TrackNumTurns { get; set; } // 1
         public string TrackPitSpeedLimit { get; set; } // 60.00 kph
         public string TrackPaceSpeed { get; set; } // 60.00 kph
-        public string TrackNumPitStalls { get; set; } // 1
+        public int TrackNumPitStalls { get; set; } // 1
         public string TrackType { get; set; } // road course
         public string TrackDirection { get; set; } // neutral
         public string TrackWeatherType { get; set; } // Generated / Dynamic Sky
@@ -53,28 +53,28 @@ namespace SVappsLAB.iRacingTelemetrySDK.Models
         public string TrackRelativeHumidity { get; set; } // 53 %
         public string TrackFogLevel { get; set; } // 0 %
         public string TrackPrecipitation { get; set; } // 0 %
-        public int TrackCleanup { get; set; }
-        public int TrackDynamicTrack { get; set; }
+        public int TrackCleanup { get; set; } // 0
+        public int TrackDynamicTrack { get; set; } // 0
         public string TrackVersion { get; set; } // 2020.11.28.01
-        public int SeriesID { get; set; }
-        public int SeasonID { get; set; }
-        public int SessionID { get; set; }
-        public int SubSessionID { get; set; }
-        public int LeagueID { get; set; }
-        public int Official { get; set; }
-        public int RaceWeek { get; set; }
+        public int SeriesID { get; set; } // 0
+        public int SeasonID { get; set; } // 0
+        public int SessionID { get; set; } // 0
+        public int SubSessionID { get; set; } // 0
+        public int LeagueID { get; set; } // 0
+        public int Official { get; set; } // 0
+        public int RaceWeek { get; set; } // 0
         public string EventType { get; set; } // Test
         public string Category { get; set; } // Road
         public string SimMode { get; set; } // full
-        public int TeamRacing { get; set; }
-        public int MinDrivers { get; set; }
-        public int MaxDrivers { get; set; }
+        public int TeamRacing { get; set; } // 0
+        public int MinDrivers { get; set; } // 0
+        public int MaxDrivers { get; set; } // 0
         public string DCRuleSet { get; set; } // None
-        public int QualifierMustStartRace { get; set; }
-        public int NumCarClasses { get; set; }
-        public int NumCarTypes { get; set; }
-        public string AIRosterName { get; set; }
-        public string HeatRacing { get; set; }
+        public int QualifierMustStartRace { get; set; } // 0
+        public int NumCarClasses { get; set; } // 1
+        public int NumCarTypes { get; set; } // 1
+        public string AIRosterName { get; set; } // ""
+        public int HeatRacing { get; set; } // 0
         public string BuildType { get; set; } // Release
         public string BuildTarget { get; set; } // Members
         public string BuildVersion { get; set; } // 2020.12.08.06
@@ -87,12 +87,12 @@ namespace SVappsLAB.iRacingTelemetrySDK.Models
 
     public class WeekendOptions
     {
-        public int NumStarters { get; set; }
+        public int NumStarters { get; set; } // 0
         public string StartingGrid { get; set; } // single file
         public string QualifyScoring { get; set; } // best lap
         public string CourseCautions { get; set; } // off
-        public int StandingStart { get; set; }
-        public int ShortParadeLap { get; set; }
+        public int StandingStart { get; set; } // 0
+        public int ShortParadeLap { get; set; } // 0
         public string Restarts { get; set; } // single file
         public string WeatherType { get; set; } // Generated / Dynamic Sky
         public string Skies { get; set; } // Partly Cloudy
@@ -104,17 +104,17 @@ namespace SVappsLAB.iRacingTelemetrySDK.Models
         public string TimeOfDay { get; set; } // 12:55 pm
         public DateTime Date { get; set; } // 2021-03-01
         public int EarthRotationSpeedupFactor { get; set; } // 1
-        public int Unofficial { get; set; }
+        public int Unofficial { get; set; } // 1
         public string CommercialMode { get; set; } // consumer
         public string NightMode { get; set; } // variable
-        public int IsFixedSetup { get; set; }
+        public int IsFixedSetup { get; set; } // 0
         public string StrictLapsChecking { get; set; } // default
-        public int HasOpenRegistration { get; set; }
-        public int HardcoreLevel { get; set; }
-        public int NumJokerLaps { get; set; }
+        public int HasOpenRegistration { get; set; } // 0
+        public int HardcoreLevel { get; set; } // 1
+        public int NumJokerLaps { get; set; } // 0
         public string IncidentLimit { get; set; } // unlimited
         public string FastRepairsLimit { get; set; } // unlimited
-        public int GreenWhiteCheckeredLimit { get; set; }
+        public int GreenWhiteCheckeredLimit { get; set; } // 0
 
     }
 

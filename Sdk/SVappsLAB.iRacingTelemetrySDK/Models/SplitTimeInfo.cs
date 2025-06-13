@@ -27,7 +27,7 @@ namespace SVappsLAB.iRacingTelemetrySDK.Models
 
     public class Sector
     {
-        public int SectorNum { get; set; }
+        public int SectorNum { get; set; } // 0
         public float SectorStartPct { get; set; } // in percentage
 
     }
