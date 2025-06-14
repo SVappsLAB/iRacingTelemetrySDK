@@ -41,7 +41,8 @@ namespace DumpVariables_DumpSessionInfo
 
             var logger = LoggerFactory
                     .Create(builder => builder
-                    .AddConsole().AddSimpleConsole(o => o.SingleLine = true))
+                    .SetMinimumLevel(LogLevel.Debug)
+                    .AddConsole())
                     .CreateLogger("logger");
 
             logger.LogInformation("pulling data from \'{source}\'", ibtOptions != null ? "IBT file session" : "Live iRacing session");

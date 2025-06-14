@@ -21,90 +21,100 @@ namespace SVappsLAB.iRacingTelemetrySDK.Models
 {
     public class DriverInfo
     {
-        public int DriverCarIdx { get; set; }
-        public int DriverUserID { get; set; }
-        public int PaceCarIdx { get; set; }
+        public int DriverCarIdx { get; set; } // 0
+        public int DriverUserID { get; set; } // 22176
+        public int PaceCarIdx { get; set; } // -1
         public float DriverHeadPosX { get; set; } // in units of length (mm, m, etc.)
         public float DriverHeadPosY { get; set; } // in units of length (mm, m, etc.)
         public float DriverHeadPosZ { get; set; } // in units of length (mm, m, etc.)
         public int DriverCarIsElectric { get; set; } // 0
-        public float DriverCarIdleRPM { get; set; }
-        public float DriverCarRedLine { get; set; }
-        public int DriverCarEngCylinderCount { get; set; }
-        public float DriverCarFuelKgPerLtr { get; set; }
-        public float DriverCarFuelMaxLtr { get; set; }
+        public float DriverCarIdleRPM { get; set; } // 875.000
+        public float DriverCarRedLine { get; set; } // 7525.000
+        public int DriverCarEngCylinderCount { get; set; } // 4
+        public float DriverCarFuelKgPerLtr { get; set; } // 0.750
+        public float DriverCarFuelMaxLtr { get; set; } // 44.987
         public float DriverCarMaxFuelPct { get; set; } // in percentage
         public int DriverCarGearNumForward { get; set; } // 6
         public int DriverCarGearNeutral { get; set; } // 1
         public int DriverCarGearReverse { get; set; } // 1
-        public float DriverCarSLFirstRPM { get; set; }
-        public float DriverCarSLShiftRPM { get; set; }
-        public float DriverCarSLLastRPM { get; set; }
-        public float DriverCarSLBlinkRPM { get; set; }
-        public string DriverCarVersion { get; set; }
+        public float DriverCarSLFirstRPM { get; set; } // 5600.000
+        public float DriverCarSLShiftRPM { get; set; } // 7200.000
+        public float DriverCarSLLastRPM { get; set; } // 7200.000
+        public float DriverCarSLBlinkRPM { get; set; } // 7700.000
+        public string DriverCarVersion { get; set; } // "2025.06.11.02"
         public float DriverPitTrkPct { get; set; } // in percentage
-        public float DriverCarEstLapTime { get; set; }
-        public string DriverSetupName { get; set; }
-        public int DriverSetupIsModified { get; set; }
-        public string DriverSetupLoadTypeName { get; set; }
-        public int DriverSetupPassedTech { get; set; }
-        public int DriverIncidentCount { get; set; }
-        public float DriverBrakeCurvingFactor { get; set; }
+        public float DriverCarEstLapTime { get; set; } // 19.6722
+        public string DriverSetupName { get; set; } // "baseline.sto"
+        public int DriverSetupIsModified { get; set; } // 0
+        public string DriverSetupLoadTypeName { get; set; } // "user"
+        public int DriverSetupPassedTech { get; set; } // 1
+        public int DriverIncidentCount { get; set; } // 0
+        public float DriverBrakeCurvingFactor { get; set; } // 0.001
         public List<Driver> Drivers { get; set; }
-
+        public List<DriverTire> DriverTires { get; set; }
     }
 
     public class Driver
     {
-        public int CarIdx { get; set; }
-        public string UserName { get; set; }
-        public string AbbrevName { get; set; }
-        public string Initials { get; set; }
-        public int UserID { get; set; }
-        public int TeamID { get; set; }
-        public string TeamName { get; set; }
-        public string CarNumber { get; set; }
-        public int CarNumberRaw { get; set; }
-        public string CarPath { get; set; }
-        public int CarClassID { get; set; }
-        public int CarID { get; set; }
-        public int CarIsPaceCar { get; set; }
-        public int CarIsAI { get; set; }
-        public int CarIsElectric { get; set; }
-        public string CarScreenName { get; set; }
-        public string CarScreenNameShort { get; set; }
-        public string CarClassShortName { get; set; }
-        public int CarClassRelSpeed { get; set; }
-        public int CarClassLicenseLevel { get; set; }
+        public int CarIdx { get; set; } // 0
+        public string UserName { get; set; } // "Scott Velez"
+        public string AbbrevName { get; set; } // ""
+        public string Initials { get; set; } // ""
+        public int UserID { get; set; } // 22176
+        public int TeamID { get; set; } // 0
+        public string TeamName { get; set; } // "Scott Velez"
+        public string CarNumber { get; set; } // "222"
+        public int CarNumberRaw { get; set; } // 222
+        public string CarPath { get; set; } // "mx5 mx52016"
+        public int CarClassID { get; set; } // 0
+        public int CarID { get; set; } // 67
+        public int CarIsPaceCar { get; set; } // 0
+        public int CarIsAI { get; set; } // 0
+        public int CarIsElectric { get; set; } // 0
+        public string CarScreenName { get; set; } // "Mazda MX-5 Cup"
+        public string CarScreenNameShort { get; set; } // "MX-5 Cup"
+        public int CarCfg { get; set; } // -1
+        public string CarCfgName { get; set; } // ""
+        public string CarCfgCustomPaintExt { get; set; } // ""
+        public string CarClassShortName { get; set; } // ""
+        public int CarClassRelSpeed { get; set; } // 0
+        public int CarClassLicenseLevel { get; set; } // 0
         public string CarClassMaxFuelPct { get; set; } // in percentage
         public string CarClassWeightPenalty { get; set; } // in kilograms
         public string CarClassPowerAdjust { get; set; } // in percentage
         public string CarClassDryTireSetLimit { get; set; } // in percentage
-        public int CarClassColor { get; set; }
-        public string CarClassEstLapTime { get; set; } // safety pcporsche911cup
-        public int IRating { get; set; }
-        public int LicLevel { get; set; }
-        public int LicSubLevel { get; set; }
-        public string LicString { get; set; }
-        public string LicColor { get; set; }
-        public int IsSpectator { get; set; }
-        public string CarDesignStr { get; set; }
-        public string HelmetDesignStr { get; set; }
-        public string SuitDesignStr { get; set; }
+        public int CarClassColor { get; set; } // 0xffffff
+        public float CarClassEstLapTime { get; set; } // 19.6722
+        public int IRating { get; set; } // 1
+        public int LicLevel { get; set; } // 1
+        public int LicSubLevel { get; set; } // 1
+        public string LicString { get; set; } // "R 0.01"
+        public string LicColor { get; set; } // "0xundefined"
+        public int IsSpectator { get; set; } // 0
+        public string CarDesignStr { get; set; } // "3,000000,12bfca,fd35d5,5a5a5a"
+        public string HelmetDesignStr { get; set; } // "4,000000,fff100,ff0000"
+        public string SuitDesignStr { get; set; } // "19,000000,ffda01,ff0000"
         public int BodyType { get; set; } // 0
-        public int FaceType { get; set; } // 0
+        public int FaceType { get; set; } // 6
         public int HelmetType { get; set; } // 0
-        public string CarNumberDesignStr { get; set; }
-        public int CarSponsor_1 { get; set; }
-        public int CarSponsor_2 { get; set; }
-        public string ClubName { get; set; }
+        public string CarNumberDesignStr { get; set; } // "0,0,ffffff,777777,000000"
+        public int CarSponsor_1 { get; set; } // 2
+        public int CarSponsor_2 { get; set; } // 2
+        public string ClubName { get; set; } // None
         public string ClubID { get; set; } // 0
-        public string DivisionName { get; set; }
+        public string DivisionName { get; set; } // Division 1 
         public string DivisionID { get; set; } // 0
-        public int CurDriverIncidentCount { get; set; }
-        public int TeamIncidentCount { get; set; }
+        public string FlairName { get; set; } // Brazil
+        public string FlairID { get; set; } // 0
+        public int CurDriverIncidentCount { get; set; } // 0
+        public int TeamIncidentCount { get; set; } // 0
 
     }
 
+    public class DriverTire
+    {
+        public int TireIndex { get; set; } // 0
+        public string TireCompoundType { get; set; } // "Hard"
+    }
 }
 #nullable enable
