@@ -113,6 +113,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
         private ILogger _logger;
 
         bool _isInitialized = false;
+        bool _isPaused = false;
 
         IBTOptions? _ibtOptions;
 
@@ -206,6 +207,10 @@ namespace SVappsLAB.iRacingTelemetrySDK
             }
             return false;
         }
+
+        public void Pause() => _isPaused = true;
+        public void Resume() => _isPaused = false;
+
         public void Dispose()
         {
             Dispose(true);
@@ -345,19 +350,23 @@ namespace SVappsLAB.iRacingTelemetrySDK
             {
                 var rawSessionInfoYaml = _dataProvider.GetSessionInfoYaml();
 
-                // if anyone wants raw yaml, send it
-                if (OnRawSessionInfoUpdate != null)
+                // suppress events if paused
+                if (!_isPaused)
                 {
-                    OnRawSessionInfoUpdate.Invoke(this, rawSessionInfoYaml);
-                }
-
-                if (OnSessionInfoUpdate != null)
-                {
-                    if (!_sessionInfoProcessingTask.IsCompleted)
+                    // if anyone wants raw yaml, send it
+                    if (OnRawSessionInfoUpdate != null)
                     {
-                        _logger.LogWarning("sessionInfo processing task is still running");
+                        OnRawSessionInfoUpdate.Invoke(this, rawSessionInfoYaml);
                     }
-                    _sessionInfoProcessingTask = UpdateSession(rawSessionInfoYaml);
+
+                    if (OnSessionInfoUpdate != null)
+                    {
+                        if (!_sessionInfoProcessingTask.IsCompleted)
+                        {
+                            _logger.LogWarning("sessionInfo processing task is still running");
+                        }
+                        _sessionInfoProcessingTask = UpdateSession(rawSessionInfoYaml);
+                    }
                 }
             }
 
@@ -369,12 +378,16 @@ namespace SVappsLAB.iRacingTelemetrySDK
                 return;
             }
 
-            // send event if we have a listener
-            if (OnTelemetryUpdate != null)
+            // suppress events if paused
+            if (!_isPaused)
             {
-                var telemetryData = GetTelemetryDataSample();
+                // send event if we have a listener
+                if (OnTelemetryUpdate != null)
+                {
+                    var telemetryData = GetTelemetryDataSample();
 
-                OnTelemetryUpdate.Invoke(this, telemetryData);
+                    OnTelemetryUpdate.Invoke(this, telemetryData);
+                }
             }
         }
 
@@ -406,14 +419,19 @@ namespace SVappsLAB.iRacingTelemetrySDK
                 // update and send session info event
                 if (_dataProvider.IsSessionInfoUpdated())
                 {
-                    var rawSessionInfoYaml = _dataProvider.GetSessionInfoYaml();
-                    if (OnRawSessionInfoUpdate != null)
+                    // suppress events if paused
+                    if (!_isPaused)
                     {
-                        OnRawSessionInfoUpdate.Invoke(this, rawSessionInfoYaml);
-                    }
-                    if (OnSessionInfoUpdate != null)
-                    {
-                        await UpdateSession(rawSessionInfoYaml);
+
+                        var rawSessionInfoYaml = _dataProvider.GetSessionInfoYaml();
+                        if (OnRawSessionInfoUpdate != null)
+                        {
+                            OnRawSessionInfoUpdate.Invoke(this, rawSessionInfoYaml);
+                        }
+                        if (OnSessionInfoUpdate != null)
+                        {
+                            await UpdateSession(rawSessionInfoYaml);
+                        }
                     }
                 }
 
@@ -426,11 +444,15 @@ namespace SVappsLAB.iRacingTelemetrySDK
                         break;
                     }
 
-                    // send event if we have a listener
-                    if (OnTelemetryUpdate != null)
+                    // suppress events if paused
+                    if (!_isPaused)
                     {
-                        var telemetryData = GetTelemetryDataSample();
-                        OnTelemetryUpdate.Invoke(this, telemetryData);
+                        // send event if we have a listener
+                        if (OnTelemetryUpdate != null && !_isPaused)
+                        {
+                            var telemetryData = GetTelemetryDataSample();
+                            OnTelemetryUpdate.Invoke(this, telemetryData);
+                        }
                     }
                 }
 
