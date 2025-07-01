@@ -1,6 +1,7 @@
-bin/
-obj/
-.vs/
-dist/
-artifacts/
 *.user
+.vs/
+artifacts/
+bin/
+dist/
+obj/
+upstream/

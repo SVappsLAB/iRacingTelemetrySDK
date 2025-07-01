@@ -78,6 +78,16 @@ namespace SVappsLAB.iRacingTelemetrySDK
         /// <param name="ct">The cancellation token to cancel the monitoring operation.</param>
         /// <returns>A task that represents the asynchronous monitoring operation.</returns>
         Task<int> Monitor(CancellationToken ct);
+
+        /// <summary>
+        /// Pauses telemetry event firing. Processing continues, but events are suppressed.
+        /// </summary>
+        void Pause();
+
+        /// <summary>
+        /// Resumes telemetry event firing.
+        /// </summary>
+        void Resume();
     }
 }
 

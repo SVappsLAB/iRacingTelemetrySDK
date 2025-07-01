@@ -37,22 +37,43 @@ namespace SpeedRPMGear
             if (args.Length == 1)
                 ibtOptions = new IBTOptions(args[0]);
 
+            logger.LogInformation("Press Ctrl-C to exit...");
+
             // create telemetry client 
             using var tc = TelemetryClient<TelemetryData>.Create(logger, ibtOptions);
 
             // subscribe to telemetry updates
             tc.OnTelemetryUpdate += OnTelemetryUpdate;
 
-            // start monitoring - exit with Ctrl-C
-            await tc.Monitor(CancellationToken.None);
+            // use this cancellation token to end processing
+            using var cts = new CancellationTokenSource();
+            var cancellationToken = cts.Token;
+
+            // start keyboard monitoring
+            // - pause telemetry events when 'p' key is pressed
+            // - resume telemetry events when 'r' key is pressed
+            // - exit program when Ctrl-C is pressed
+            var keyboardTask = MonitorKeyboardAsync();
+
+            // start iRacing monitoring
+            var monitorTask = tc.Monitor(cancellationToken);
+
+            // wait for either task to complete
+            // - when 'live', the keyboard task (Ctrl-C) is most likely to complete first (before the iRacing session ends)
+            // - when playing 'IBT' files, the monitoring task is most likely to complete first (at end-of-file)
+            await Task.WhenAny(keyboardTask, monitorTask);
+
+            // regardless of which task completes first,
+            // set the cancellation token so the other task can complete
+            cts.Cancel();
+
+            // await for all tasks to complete
+            await Task.WhenAll(monitorTask, keyboardTask);
+
 
             // event handler
             void OnTelemetryUpdate(object? sender, TelemetryData e)
             {
-                // don't bother with data if we are not in car and on track 
-                if (!e.IsOnTrackCar)
-                    return;
-
                 // to reduce logging, only log every 60th update (once a second)
                 if ((counter++ % 60f) != 0)
                     return;
@@ -60,6 +81,28 @@ namespace SpeedRPMGear
                 // convert speed from m/s to mph
                 var mph = e.Speed * 2.23694f;
                 logger.LogInformation("gear: {gear}, rpm: {rpm}, speed: {speed}", e.Gear, e.RPM.ToString("F0"), mph.ToString("F0"));
+            }
+            async Task MonitorKeyboardAsync()
+            {
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    if (Console.KeyAvailable)
+                    {
+                        var key = Console.ReadKey(intercept: true);
+                        if (key.Key == ConsoleKey.P)
+                        {
+                            tc.Pause();
+                            logger.LogInformation("Telemetry paused.");
+                        }
+                        else if (key.Key == ConsoleKey.R)
+                        {
+                            tc.Resume();
+                            logger.LogInformation("Telemetry resumed.");
+                        }
+                    }
+                    // wait a short time to avoid busy waiting
+                    await Task.Delay(100, cancellationToken);
+                }
             }
         }
     }

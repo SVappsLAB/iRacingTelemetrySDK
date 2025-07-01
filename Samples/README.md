@@ -18,5 +18,6 @@ All of these examples can be used with a running 'live' instance of iRacing, or 
 
 * [SpeedRPMGear](./SpeedRPMGear/)
 
-    Simple program to output cars telemetry data for speed, engine rpm and what gear it's in
+    Simple program to output cars telemetry data for speed, engine rpm and what gear it's in.
+    [New] - Use 'p' (pause) and 'r' (resume) keys on the keyboard to pause and resume the telemetry output.
 
