@@ -1,7 +1,9 @@
-*.user
-.vs/
+.user
+.vs
 artifacts/
 bin/
 dist/
+node_modules/
 obj/
 upstream/
+
