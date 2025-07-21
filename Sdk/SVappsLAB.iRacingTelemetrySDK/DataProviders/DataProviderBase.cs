@@ -11,7 +11,7 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License.using Microsoft.CodeAnalysis;
+ * limitations under the License.
 **/
 
 using System;
@@ -19,6 +19,8 @@ using System.Collections.Generic;
 using System.IO.MemoryMappedFiles;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using SVappsLAB.iRacingTelemetrySDK.irSDKDefines;
 
@@ -38,7 +40,7 @@ namespace SVappsLAB.iRacingTelemetrySDK.DataProviders
         }
     }
 
-    internal abstract unsafe class DataProviderBase : IDisposable
+    internal abstract unsafe class DataProviderBase : IAsyncDisposable
     {
         private static readonly Encoding TelemetryEncoding = Encoding.GetEncoding("ISO-8859-1");
 
@@ -56,12 +58,25 @@ namespace SVappsLAB.iRacingTelemetrySDK.DataProviders
         public DataProviderBase(ILogger logger)
         {
             _logger = logger;
-            _logger.LogInformation($"Initializing {GetType().Name}.");
+            _logger.LogDebug($"Initializing {GetType().Name}.");
         }
-        public void Dispose()
+
+        public virtual ValueTask DisposeAsync()
         {
-            Dispose(true);
+            if (_viewAccessor != null)
+            {
+                _viewAccessor.SafeMemoryMappedViewHandle.ReleasePointer();
+                _viewAccessor.Dispose();
+                _viewAccessor = null;
+            }
+            if (_mmFile != null)
+            {
+                _mmFile.Dispose();
+                _mmFile = null;
+            }
+
             GC.SuppressFinalize(this);
+            return ValueTask.CompletedTask;
         }
 
         public void OpenDataSource(string ibtFilename)
@@ -110,11 +125,12 @@ namespace SVappsLAB.iRacingTelemetrySDK.DataProviders
             return sessInfo;
         }
 
-        public object GetVarValue(string varName)
+        public object? GetVarValue(string varName)
         {
             if (!_varHeaders!.TryGetValue(varName, out irsdk_varHeader vh))
             {
-                throw new Exception($"the telemetry value '{varName}' does not exist");
+                _logger.LogDebug("Telemetry variable [{varName}] not found in data provider", varName);
+                return null;
             }
 
             var rosBuffer = _telemetryDataBuffer.AsSpan();
@@ -139,23 +155,23 @@ namespace SVappsLAB.iRacingTelemetrySDK.DataProviders
                     break;
                 case irsdk_VarType.irsdk_bool:
                     {
-                        val = GetValue<bool>(rosBuffer, vh.offset, vh.count);
+                        val = GetValue<bool>(rosBuffer, vh.offset, vh.count, vh.type);
                     }
                     break;
                 case irsdk_VarType.irsdk_int:
                 case irsdk_VarType.irsdk_bitField:
                     {
-                        val = GetValue<int>(rosBuffer, vh.offset, vh.count);
+                        val = GetValue<int>(rosBuffer, vh.offset, vh.count, vh.type);
                     }
                     break;
                 case irsdk_VarType.irsdk_float:
                     {
-                        val = GetValue<float>(rosBuffer, vh.offset, vh.count);
+                        val = GetValue<float>(rosBuffer, vh.offset, vh.count, vh.type);
                     }
                     break;
                 case irsdk_VarType.irsdk_double:
                     {
-                        val = GetValue<double>(rosBuffer, vh.offset, vh.count);
+                        val = GetValue<double>(rosBuffer, vh.offset, vh.count, vh.type);
                     }
                     break;
                 default:
@@ -166,7 +182,7 @@ namespace SVappsLAB.iRacingTelemetrySDK.DataProviders
         }
 
         // wait for iRacing to signal there is new data
-        public abstract bool WaitForDataReady(TimeSpan timeSpan);
+        public abstract Task<bool> WaitForDataReady(TimeSpan timeSpan, CancellationToken cancellationToken = default);
 
         public VarHeaderDictionary? GetVarHeaders()
         {
@@ -182,27 +198,6 @@ namespace SVappsLAB.iRacingTelemetrySDK.DataProviders
             ros.CopyTo(_telemetryDataBuffer);
         }
 
-        protected virtual void Dispose(bool disposing)
-        {
-            if (disposing)
-            {
-                if (_viewAccessor != null)
-                {
-                    _viewAccessor.SafeMemoryMappedViewHandle.ReleasePointer();
-                    _viewAccessor.Dispose();
-                    _viewAccessor = null;
-                }
-                if (_mmFile != null)
-                {
-                    _mmFile.Dispose();
-                    _mmFile = null;
-                }
-            }
-        }
-        ~DataProviderBase()
-        {
-            Dispose(false);
-        }
         VarHeaderDictionary ReadVarHeaders()
         {
             var ros = new ReadOnlySpan<irsdk_varHeader>(_dataPtr + _header.varHeaderOffset, _header.numVars);
@@ -244,15 +239,29 @@ namespace SVappsLAB.iRacingTelemetrySDK.DataProviders
             return TelemetryEncoding.GetString(data.Slice(0, actualLength));
         }
 
-        object GetValue<T>(ReadOnlySpan<byte> span, int offset, int count) where T : struct
+        object GetValue<T>(ReadOnlySpan<byte> span, int offset, int count, irsdk_VarType type) where T : struct
         {
-            var ros = MemoryMarshal.Cast<byte, T>(span.Slice(offset, count * Marshal.SizeOf(typeof(T))));
-            var data = ros.ToArray();
-            object val = count == 1 ? data[0] : data;
-            return val;
+            int elementSizeInBytes = type switch
+            {
+                irsdk_VarType.irsdk_bool => sizeof(bool),
+                irsdk_VarType.irsdk_int => sizeof(int),
+                irsdk_VarType.irsdk_bitField => sizeof(int),
+                irsdk_VarType.irsdk_float => sizeof(float),
+                irsdk_VarType.irsdk_double => sizeof(double),
+                _ => throw new NotImplementedException($"{type} size not implemented")
+            };
+
+            var ros = MemoryMarshal.Cast<byte, T>(span.Slice(offset, count * elementSizeInBytes));
+
+            // optimize memory allocation: avoid array allocation for single values
+            if (count == 1)
+                return ros[0];
+            else
+                return ros.ToArray();
         }
 
     }
+
 
 }
 

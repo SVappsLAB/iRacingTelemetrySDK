@@ -11,13 +11,13 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License.using Microsoft.CodeAnalysis;
+ * limitations under the License.
 **/
 
 using System.Collections.Generic;
 
 #nullable disable
-namespace SVappsLAB.iRacingTelemetrySDK.Models
+namespace SVappsLAB.iRacingTelemetrySDK
 {
     public class DriverInfo
     {
@@ -118,7 +118,7 @@ namespace SVappsLAB.iRacingTelemetrySDK.Models
     public class DriverTire
     {
         public int TireIndex { get; set; } // 0
-        public string TireCompoundType { get; set; } // "Hard"
+        public string TireCompoundType { get; set; } // "Hard, Soft, Qualifying, Wet, AllPurpose"
     }
 }
 #nullable enable

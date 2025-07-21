@@ -1,9 +1,8 @@
-.user
+*.user
 .vs
+Samples/**/docs/
 artifacts/
 bin/
 dist/
-node_modules/
 obj/
-upstream/
 

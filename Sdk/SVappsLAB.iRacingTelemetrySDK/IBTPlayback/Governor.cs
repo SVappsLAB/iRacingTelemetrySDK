@@ -11,7 +11,7 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License.using Microsoft.CodeAnalysis;
+ * limitations under the License.
 **/
 
 using System;
@@ -21,16 +21,16 @@ using Microsoft.Extensions.Logging;
 
 namespace SVappsLAB.iRacingTelemetrySDK.IBTPlayback
 {
-    public record GovernorStats(long elapsedMs, int CurrentRecord, int TargetRecord, double OldDelay, double NewDelay);
+    internal record GovernorStats(long elapsedMs, int CurrentRecord, int TargetRecord, double OldDelay, double NewDelay);
 
-    public interface IPlaybackGovernor
+    internal interface IPlaybackGovernor
     {
         public void StartPlayback();
         public Task GovernSpeed(int recNum);
         public GovernorStats GetStats();
     }
 
-    public class SimpleGovernor : IPlaybackGovernor
+    internal class SimpleGovernor : IPlaybackGovernor
     {
         const int STANDARD_HZ = 60;
         const double STANDARD_MS_PER_RECORD = 1000d / STANDARD_HZ;

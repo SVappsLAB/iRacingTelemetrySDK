@@ -11,19 +11,19 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License.using Microsoft.CodeAnalysis;
+ * limitations under the License.
 **/
 
 using System;
 
 #nullable disable
-namespace SVappsLAB.iRacingTelemetrySDK.Models
+namespace SVappsLAB.iRacingTelemetrySDK
 {
     public class WeekendInfo
     {
         public string TrackName { get; set; } // spa up
         public int TrackID { get; set; } // 143
-        public string TrackLength { get; set; } // 6.93 km
+        public string TrackLength { get; set; } // 6.93 km (10cm accuracy)
         public string TrackLengthOfficial { get; set; } // 7.00 km
         public string TrackDisplayName { get; set; } // Circuit de Spa-Francorchamps
         public string TrackDisplayShortName { get; set; } // Spa

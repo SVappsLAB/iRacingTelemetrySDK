@@ -11,7 +11,7 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License.using Microsoft.CodeAnalysis;
+ * limitations under the License.
 **/
 
 using System;
@@ -20,13 +20,13 @@ using YamlDotNet.Serialization;
 
 namespace SVappsLAB.iRacingTelemetrySDK
 {
-    public record struct ParseResult<T>(T Model, int ParseAttemptsRequired);
-    public interface ISessionInfoParser
+    internal record struct ParseResult<T>(T Model, int ParseAttemptsRequired);
+    internal interface ISessionInfoParser
     {
         public ParseResult<T> Parse<T>(string sessionInfo);
     }
 
-    public class YamlParser : ISessionInfoParser
+    internal class YamlParser : ISessionInfoParser
     {
         readonly IDeserializer _yamlDeserializer;
 

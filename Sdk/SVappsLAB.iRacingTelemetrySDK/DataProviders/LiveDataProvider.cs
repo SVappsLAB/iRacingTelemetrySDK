@@ -11,12 +11,13 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License.using Microsoft.CodeAnalysis;
+ * limitations under the License.
 **/
 
 using System;
 using System.IO.MemoryMappedFiles;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using SVappsLAB.iRacingTelemetrySDK.irSDKDefines;
 
@@ -50,15 +51,13 @@ namespace SVappsLAB.iRacingTelemetrySDK.DataProviders
             _dataReadyEvent = new AutoResetEvent(false) { SafeWaitHandle = new Microsoft.Win32.SafeHandles.SafeWaitHandle(rawEvent, true) };
         }
 
-        public override bool WaitForDataReady(TimeSpan timeSpan)
+        public override Task<bool> WaitForDataReady(TimeSpan timeSpan, CancellationToken cancellationToken = default)
         {
-            var signaled = _dataReadyEvent!.WaitOne(timeSpan);
-            if (!signaled)
-            {
-                _logger.LogDebug("timeout waiting for data ready event");
-                return false;
-            }
+            return LiveDataProviderAsyncHelper.WaitForDataReady(_dataReadyEvent!, timeSpan, cancellationToken, _logger, this);
+        }
 
+        internal bool ProcessNewData()
+        {
             var latestTickCount = GetLatestVarBuff().tickCount;
 
             // if we missed any telemetry data, log that it happened
@@ -101,17 +100,30 @@ namespace SVappsLAB.iRacingTelemetrySDK.DataProviders
             return vb;
 
         }
-        protected override void Dispose(bool disposing)
+        public override ValueTask DisposeAsync()
         {
-            if (disposing)
+            if (_dataReadyEvent != null)
             {
-                if (_dataReadyEvent != null)
-                {
-                    _dataReadyEvent.Dispose();
-                    _dataReadyEvent = null;
-                }
+                _dataReadyEvent.Dispose();
+                _dataReadyEvent = null;
             }
-            base.Dispose(disposing);
+            return base.DisposeAsync();
+        }
+    }
+
+    // Helper class to handle async operations outside unsafe context
+    internal static class LiveDataProviderAsyncHelper
+    {
+        public static async Task<bool> WaitForDataReady(AutoResetEvent dataReadyEvent, TimeSpan timeSpan, CancellationToken cancellationToken, ILogger logger, LiveDataProvider provider)
+        {
+            var signaled = await Task.Run(() => dataReadyEvent.WaitOne(timeSpan), cancellationToken).ConfigureAwait(false);
+            if (!signaled)
+            {
+                logger.LogDebug("timeout waiting for data ready event");
+                return false;
+            }
+
+            return provider.ProcessNewData();
         }
     }
 }

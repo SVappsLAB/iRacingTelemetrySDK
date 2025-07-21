@@ -1,0 +1,20 @@
+<Project>
+  <PropertyGroup>
+    <SVappsLAB_iRacingTelemetrySDK_AI_USAGE_Source>$(MSBuildThisFileDirectory)..\contentFiles\any\any\docs\SVappsLAB.iRacingTelemetrySDK\AI_USAGE.md</SVappsLAB_iRacingTelemetrySDK_AI_USAGE_Source>
+    <SVappsLAB_iRacingTelemetrySDK_AI_USAGE_Target>$(MSBuildProjectDirectory)\docs\SVappsLAB.iRacingTelemetrySDK\AI_USAGE.md</SVappsLAB_iRacingTelemetrySDK_AI_USAGE_Target>
+  </PropertyGroup>
+
+  <Target Name="CopySVappsLAB_iRacingTelemetrySDK_AI_USAGE" BeforeTargets="BeforeBuild">
+    <MakeDir Directories="$(MSBuildProjectDirectory)\docs\SVappsLAB.iRacingTelemetrySDK" />
+    <Copy SourceFiles="$(SVappsLAB_iRacingTelemetrySDK_AI_USAGE_Source)"
+          DestinationFiles="$(SVappsLAB_iRacingTelemetrySDK_AI_USAGE_Target)"
+          SkipUnchangedFiles="true" />
+    <ItemGroup>
+      <FileWrites Include="$(SVappsLAB_iRacingTelemetrySDK_AI_USAGE_Target)" />
+    </ItemGroup>
+  </Target>
+
+  <ItemGroup>
+    <None Include="$(SVappsLAB_iRacingTelemetrySDK_AI_USAGE_Target)" Visible="true" Condition="Exists('$(SVappsLAB_iRacingTelemetrySDK_AI_USAGE_Target)')" />
+  </ItemGroup>
+</Project>

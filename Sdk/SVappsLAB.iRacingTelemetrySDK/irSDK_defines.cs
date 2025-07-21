@@ -11,7 +11,7 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License.using Microsoft.CodeAnalysis;
+ * limitations under the License.
 **/
 
 using System;
@@ -29,13 +29,16 @@ namespace SVappsLAB.iRacingTelemetrySDK.irSDKDefines
 
     internal enum irsdk_VarType : Int32
     {
+        // 1 byte
         irsdk_char = 0,
         irsdk_bool,
 
+        // 4 bytes
         irsdk_int,
         irsdk_bitField,
         irsdk_float,
 
+        // 8 bytes
         irsdk_double,
 
         irsdk_ETCount

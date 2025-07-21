@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "SmokeTests": {
+      "commandName": "Project",
+      "commandLineArgs": "--filter-class \"SmokeTests.Live\""
+    }
+  }
+}
