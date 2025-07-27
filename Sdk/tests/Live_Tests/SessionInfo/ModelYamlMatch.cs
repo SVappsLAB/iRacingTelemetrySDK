@@ -85,7 +85,9 @@ namespace Live_Tests
 
             foreach (var entry in yamlObject)
             {
-                string key = entry.Key.ToString();
+                string? key = entry.Key?.ToString();
+                if (key == null) continue;
+
                 string propertyPath = string.IsNullOrEmpty(currentPath) ? key : $"{currentPath}.{key}";
 
                 // check if the property exists in the model

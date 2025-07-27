@@ -40,6 +40,7 @@ namespace SVappsLAB.iRacingTelemetrySDK.DataProviders
 
     internal abstract unsafe class DataProviderBase : IDisposable
     {
+        private static readonly Encoding TelemetryEncoding = Encoding.GetEncoding("ISO-8859-1");
 
         protected ILogger _logger;
         byte[]? _telemetryDataBuffer;
@@ -102,27 +103,10 @@ namespace SVappsLAB.iRacingTelemetrySDK.DataProviders
         {
             var header = GetHeader();
             var offSet = header.sessionInfoOffset;
+            var maxLen = header.sessionInfoLen;
 
-            // this is the maximum length
-            var len = header.sessionInfoLen;
-
-            // but the actual length may be shorter, so we need
-            // to scan and find the null terminator, if there is one
-            Span<byte> span = new Span<byte>(_dataPtr + offSet, len);
-            for (int i = 0; i < span.Length; i++)
-            {
-                if (span[i] == 0)
-                {
-                    _logger.LogDebug("SessionInfo: length is {len}, but found null terminator at {i}", len, i);
-
-                    // adjust length
-                    len = i;
-                    break;
-                }
-            }
-
-            // convert buffer (from 'offSet' to 'len') to a string
-            var sessInfo = Marshal.PtrToStringAnsi(new nint(_dataPtr + GetHeader().sessionInfoOffset), len);
+            var span = new Span<byte>(_dataPtr + offSet, maxLen);
+            var sessInfo = ExtractNullTerminatedString(span, maxLen);
             return sessInfo;
         }
 
@@ -148,7 +132,8 @@ namespace SVappsLAB.iRacingTelemetrySDK.DataProviders
                         }
                         else
                         {
-                            val = Encoding.ASCII.GetString(_telemetryDataBuffer!, vh.offset, vh.count);
+                            var span = _telemetryDataBuffer.AsSpan(vh.offset, vh.count);
+                            val = ExtractNullTerminatedString(span, vh.count);
                         }
                     }
                     break;
@@ -233,6 +218,32 @@ namespace SVappsLAB.iRacingTelemetrySDK.DataProviders
 
             return dict;
         }
+
+        /// <summary>
+        /// Extract a null-terminated string from a byte span using the specified encoding
+        /// </summary>
+        /// <param name="data">The byte span containing the string data</param>
+        /// <param name="expectedLength">The maximum expected length of the string</param>
+        /// <returns>Decoded string up to the first null byte or end of span</returns>
+        private string ExtractNullTerminatedString(Span<byte> data, int expectedLength)
+        {
+            // Scan for null terminator
+            int actualLength = data.Length;
+            for (int i = 0; i < data.Length; i++)
+            {
+                if (data[i] == 0)
+                {
+                    actualLength = i;
+                    if (actualLength < expectedLength)
+                    {
+                        _logger.LogDebug("String length is {actualLength}, but expected length was {expectedLength}", actualLength, expectedLength);
+                    }
+                    break;
+                }
+            }
+            return TelemetryEncoding.GetString(data.Slice(0, actualLength));
+        }
+
         object GetValue<T>(ReadOnlySpan<byte> span, int offset, int count) where T : struct
         {
             var ros = MemoryMarshal.Cast<byte, T>(span.Slice(offset, count * Marshal.SizeOf(typeof(T))));

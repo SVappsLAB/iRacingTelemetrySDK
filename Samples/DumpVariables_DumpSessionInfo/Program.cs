@@ -20,7 +20,7 @@ using SVappsLAB.iRacingTelemetrySDK.Models;
 
 namespace DumpVariables_DumpSessionInfo
 {
-    [RequiredTelemetryVars([])]
+    [RequiredTelemetryVars(["rpm"])]
     internal class Program
     {
 

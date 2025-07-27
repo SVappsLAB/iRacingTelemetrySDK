@@ -15,12 +15,13 @@
     <NoWarn>$(NoWarn);CS8601,CS8618</NoWarn>
   </PropertyGroup>
 
+
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.4">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="xunit.v3" Version="2.0.3" />
+    <PackageReference Include="xunit.v3" Version="3.0.0" />
   </ItemGroup>
 
   <ItemGroup>
