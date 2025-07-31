@@ -9,7 +9,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.7" />
-    <PackageReference Include="SVappsLAB.iRacingTelemetrySDK" Version="0.9.8" />
+    <PackageReference Include="SVappsLAB.iRacingTelemetrySDK" Version="0.9.8.1" />
   </ItemGroup>
 
 </Project>
