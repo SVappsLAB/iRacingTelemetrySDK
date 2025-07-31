@@ -221,7 +221,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
             _logger.LogDebug("Shutting down");
             try
             {
-                await _task!;
+                await _task!.ConfigureAwait(false);
 
                 //Uninitialize();
 
@@ -240,7 +240,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
         {
             if (disposing)
             {
-                await Shutdown();
+                await Shutdown().ConfigureAwait(false);
             }
         }
         ~TelemetryClient()
@@ -296,7 +296,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
             {
                 try
                 {
-                    await WaitForData(ct);
+                    await WaitForData(ct).ConfigureAwait(false);
                 }
                 catch (TaskCanceledException)
                 {
@@ -320,7 +320,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
             // ensure initialization
             if (!_isInitialized && !Initialize())
             {
-                await Task.Delay(INITIALIZATION_DELAY_MS, ct);
+                await Task.Delay(INITIALIZATION_DELAY_MS, ct).ConfigureAwait(false);
                 return;
             }
 
@@ -341,7 +341,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
             // if we can't connect to iRacing, there is nothing to do
             if (!isConnected)
             {
-                await Task.Delay(INITIALIZATION_DELAY_MS, ct);
+                await Task.Delay(INITIALIZATION_DELAY_MS, ct).ConfigureAwait(false);
                 return;
             }
 
@@ -430,7 +430,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
                         }
                         if (OnSessionInfoUpdate != null)
                         {
-                            await UpdateSession(rawSessionInfoYaml);
+                            await UpdateSession(rawSessionInfoYaml).ConfigureAwait(false);
                         }
                     }
                 }
