@@ -50,6 +50,10 @@ namespace SVappsLAB.iRacingTelemetrySDK.Models
         public int DriverSetupPassedTech { get; set; } // 1
         public int DriverIncidentCount { get; set; } // 0
         public float DriverBrakeCurvingFactor { get; set; } // 0.001
+        public int DriverIsAdmin { get; set; } // 0/1 - the player is an admin and can have access to the admin chat commands
+        public string DriverGearboxType { get; set; } // Sequential/H-Pattern/Automatic/Unknown - transmission type in virtual car
+        public string DriverGearboxControlType { get; set; } // Sequential/H-Pattern/H-Pattern Direct/Automatic/Unknown - physical shifter type player is using
+        public string DriverCarShiftAid { get; set; } // Manual/Antistall/Antistall_Clutch/Antistall_Clutch_Throttle/Automatic - type of shift aids the driver has turned on
         public List<Driver> Drivers { get; set; }
         public List<DriverTire> DriverTires { get; set; }
     }

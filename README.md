@@ -32,6 +32,8 @@ Once you know what variables are available and you have the list of which ones y
 
 To incorporate **iRacingTelemetrySDK** into your projects, follow these steps:
 
+> 📚 **For comprehensive documentation and advanced usage patterns**, see [AI_CONTEXT.md](./AI_CONTEXT.md) - a detailed guide designed for developers and AI coding assistants.
+
 1. **Install the Package:** Add the **iRacingTelemetrySDK** NuGet package to your project using your preferred package manager.
 
     ```

@@ -447,6 +447,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
             "CarIdxSessionFlags" => typeof(SessionFlags),
             "EngineWarnings" => typeof(EngineWarnings),
             "PitSvFlags" => typeof(PitServiceFlags),
+            "PlayerIncidents" => typeof(IncidentFlags),
             "SessionFlags" => typeof(SessionFlags),
             _ => null
         };

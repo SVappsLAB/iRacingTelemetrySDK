@@ -14,8 +14,6 @@
  * limitations under the License.using Microsoft.CodeAnalysis;
 **/
 
-using System;
-
 // bit fields
 namespace SVappsLAB.iRacingTelemetrySDK
 {
@@ -29,6 +27,8 @@ namespace SVappsLAB.iRacingTelemetrySDK
         PitSpeedLimiter = 0x0010,
         RevLimiterActive = 0x0020,
         OilTempWarning = 0x0040,
+        RepairsNeededManditory = 0x0080,
+        RepairsNeededOptional = 0x0100,
     };
 
     // global flags
@@ -102,5 +102,34 @@ namespace SVappsLAB.iRacingTelemetrySDK
         EndOfLine = 0x0001,
         FreePass = 0x0002,
         WavedAround = 0x0004,
+    };
+
+    [Flags]
+    public enum IncidentFlags
+    {
+        // first byte is incident report flag
+        // only one of these will be used
+        RepNoReport = 0x0000, // no penalty 
+        RepOutOfControl = 0x0001, // "Loss of Control (2x)"
+        RepOffTrack = 0x0002, // "Off Track (1x)"
+        RepOffTrackOngoing = 0x0003, // not currently sent
+        RepContactWithWorld = 0x0004, // "Contact (0x)"
+        RepCollisionWithWorld = 0x0005, // "Contact (2x)"
+        RepCollisionWithWorldOngoing = 0x0006, // not currently sent
+        RepContactWithCar = 0x0007, // "Car Contact (0x)"
+        RepCollisionWithCar = 0x0008, // "Car Contact (4x)"
+
+        // second byte is incident penalty
+        // only one of these will be used
+        PenNoReport = 0x0000, // no penalty
+        PenZeroX = 0x0100, // 0x
+        PenOneX = 0x0200, // 1x
+        PenTwoX = 0x0300, // 2x
+        PenFourX = 0x0400, // 4x
+
+        // not enums, used to separate the above incident report field
+        // from the incident penalty field
+        IncidentRepMask = 0x000000FF,
+        IncidentPenMask = 0x0000FF00,
     };
 }
