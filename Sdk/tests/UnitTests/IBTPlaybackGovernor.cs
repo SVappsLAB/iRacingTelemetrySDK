@@ -14,7 +14,9 @@
  * limitations under the License.using Microsoft.CodeAnalysis;
 **/
 
+using System;
 using System.Diagnostics;
+using System.Threading.Tasks;
 
 #if DEBUG
 using Microsoft.Extensions.Logging;

@@ -17,15 +17,17 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.Metrics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using SVappsLAB.iRacingTelemetrySDK.DataProviders;
 using SVappsLAB.iRacingTelemetrySDK.irSDKDefines;
-using SVappsLAB.iRacingTelemetrySDK.Models;
+using SVappsLAB.iRacingTelemetrySDK.Metrics;
 
 namespace SVappsLAB.iRacingTelemetrySDK
 {
@@ -92,20 +94,53 @@ namespace SVappsLAB.iRacingTelemetrySDK
         }
     }
 
+    /**
+     * Options for data channels
+     */
+    public record class ChannelOptions(int channelSize = 10, bool multipleReaders = false);
 
+    /// <summary>
+    /// Configuration options that control various aspects of telemetry processing.
+    /// </summary>
+    public class ClientOptions
+    {
+        /// <summary>
+        /// Optional factory for creating metrics to monitor telemetry processing performance.
+        /// Tracks processing duration and record counts.
+        /// </summary>
+        public IMeterFactory? MeterFactory { get; init; }
 
-    public class TelemetryClient<T> : ITelemetryClient<T> where T : struct
+        /// <summary>
+        /// Optional configuration for data stream channels.
+        /// </summary>
+        public ChannelOptions? ChannelOptions { get; init; }
+    }
+
+    public class TelemetryClient<T> : ITelemetryClient<T>, IDisposable, IAsyncDisposable where T : struct
     {
         private const int DATA_READY_TIMEOUT_MS = 30;
         private const int INITIALIZATION_DELAY_MS = 1000;
 
-        public event EventHandler<T>? OnTelemetryUpdate;
-        public event EventHandler<string>? OnRawSessionInfoUpdate;
-        public event EventHandler<TelemetrySessionInfo>? OnSessionInfoUpdate;
-        public event EventHandler<ExceptionEventArgs>? OnError;
-        public event EventHandler<ConnectStateChangedEventArgs>? OnConnectStateChanged;
+        private readonly Channel<ConnectStateChangedEventArgs> _connectStateChannel;
+        private readonly Channel<ExceptionEventArgs> _errorChannel;
+        private readonly Channel<string> _rawSessionDataChannel;
+        private readonly Channel<TelemetrySessionInfo> _sessionDataChannel;
+        private readonly Channel<T> _telemetryDataChannel;
+        private readonly Channel<string> _internalSessionInfoChannel;
 
-        Task<int>? _task;
+        public ChannelReader<ConnectStateChangedEventArgs> ConnectStateStream => _connectStateChannel.Reader;
+        public ChannelReader<ExceptionEventArgs> ErrorStream => _errorChannel.Reader;
+        public ChannelReader<string> RawSessionDataStream => _rawSessionDataChannel.Reader;
+        public ChannelReader<TelemetrySessionInfo> SessionDataStream => _sessionDataChannel.Reader;
+        public ChannelReader<T> TelemetryDataStream => _telemetryDataChannel.Reader;
+
+        IMetricsService? _metricsService;
+        Task<int>? _dataProcessingTask;
+        Task? _sessionInfoProcessorTask;
+        CancellationTokenSource? _sessionInfoProcessingCTS;    // background processing cancellation token source
+
+        // Disposal state tracking
+        private volatile bool _disposed = false;
 
         public bool _lastConnectionStatus = false;
 
@@ -118,15 +153,17 @@ namespace SVappsLAB.iRacingTelemetrySDK
         IBTOptions? _ibtOptions;
 
         IDataProvider _dataProvider;
-        private System.Reflection.ConstructorInfo _telemetryDataConstructorInfo;
-        private IEnumerable<System.Reflection.ParameterInfo> _telemetryDataConstructorParameters;
+        private readonly TelemetryDataAccessor<T> _telemetryAccessor;
 
         // factory to create instances of the client
-        public static ITelemetryClient<T> Create(ILogger logger, IBTOptions? ibtOptions = null)
-        {
-            return new TelemetryClient<T>(logger, ibtOptions);
-        }
-        private TelemetryClient(ILogger logger, IBTOptions? ibtOptions = null)
+        public static ITelemetryClient<T> Create(ILogger logger, IBTOptions? options) =>
+            new TelemetryClient<T>(logger, null, options);
+        public static ITelemetryClient<T> Create(ILogger logger, ClientOptions options) =>
+            new TelemetryClient<T>(logger, options, null);
+        public static ITelemetryClient<T> Create(ILogger logger, ClientOptions? clientOptions = null, IBTOptions? ibtOptions = null) =>
+            new TelemetryClient<T>(logger, clientOptions, ibtOptions);
+
+        private TelemetryClient(ILogger logger, ClientOptions? clientOptions = null, IBTOptions? ibtOptions = null)
         {
             // do a quick check for valid ibt file and bail immediately if not found
             if (ibtOptions != null && !File.Exists(ibtOptions.IbtFilePath))
@@ -137,142 +174,366 @@ namespace SVappsLAB.iRacingTelemetrySDK
             _logger = logger;
             _ibtOptions = ibtOptions;
 
+            // initialize bounded channels
+            var chOptions = clientOptions?.ChannelOptions ?? new ChannelOptions();
+            var boundedChannelOptions = new BoundedChannelOptions(chOptions.channelSize)
+            {
+                FullMode = BoundedChannelFullMode.DropOldest,
+                SingleReader = chOptions.multipleReaders == false,
+                SingleWriter = true
+            };
+            _connectStateChannel = Channel.CreateBounded<ConnectStateChangedEventArgs>(boundedChannelOptions);
+            _errorChannel = Channel.CreateBounded<ExceptionEventArgs>(boundedChannelOptions);
+            _rawSessionDataChannel = Channel.CreateBounded<string>(boundedChannelOptions);
+            _sessionDataChannel = Channel.CreateBounded<TelemetrySessionInfo>(boundedChannelOptions);
+            _telemetryDataChannel = Channel.CreateBounded<T>(boundedChannelOptions);
+
+            // Internal session info processing channel
+            var sessionInfoChannelOptions = new BoundedChannelOptions(10)
+            {
+                FullMode = BoundedChannelFullMode.DropOldest,
+                SingleReader = true,
+                SingleWriter = false // Both Live and IBT can write
+            };
+            _internalSessionInfoChannel = Channel.CreateBounded<string>(sessionInfoChannelOptions);
+
+            // initialize data provider
             _dataProvider = _ibtOptions == null ? new LiveDataProvider(_logger) : new IBTDataProvider(_logger, _ibtOptions);
 
-            // get constructor and parameters of the TelemetryData type
-            // we'll need them later when we create instances of the type
-            _telemetryDataConstructorInfo = typeof(T).GetConstructors()[0];
-            _telemetryDataConstructorParameters = _telemetryDataConstructorInfo.GetParameters();
+            _metricsService = new MetricsService(clientOptions?.MeterFactory, _ibtOptions == null ? "Live" : "IBT");
 
+            _telemetryAccessor = new TelemetryDataAccessor<T>(_logger);
             _sessionInfoParser = new YamlParser();
         }
 
-        public Task<int> Monitor(CancellationToken ct)
+        public async Task<int> Monitor(CancellationToken ct)
         {
             _logger.LogDebug("monitoring '{mode}' data", IsOnlineMode ? "Live" : "IBT");
 
-            _task = IsOnlineMode ?
-                Task.Run<int>(() => ProcessLiveData(ct), ct) :
-                Task.Run<int>(() => ProcessIbtData(ct), ct);
+            _sessionInfoProcessingCTS = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            try
+            {
+                _sessionInfoProcessorTask = StartSessionInfoProcessorTask(_sessionInfoProcessingCTS.Token);
+                _dataProcessingTask = StartDataProcessorTask(ct);
 
-            return _task;
+                var result = await _dataProcessingTask;
+                await _sessionInfoProcessorTask;    // give the session info processor a chance to complete
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error starting processing tasks");
+                throw;
+            }
+        }
+
+        private Task StartSessionInfoProcessorTask(CancellationToken ct)
+        {
+            var task = Task.Run(async () =>
+            {
+                _logger.LogDebug("Session info processor started on task {taskId}", Task.CurrentId);
+                await ProcessSessionInfoChannelAsync(ct).ConfigureAwait(false);
+            }, ct);
+
+            return task;
+        }
+
+        private Task<int> StartDataProcessorTask(CancellationToken ct)
+        {
+            // Start the main data processing task on thread pool for true concurrency
+            _dataProcessingTask = Task.Run(async () =>
+            {
+                _logger.LogDebug("{mode} data processor started on task {taskId}", IsOnlineMode ? "Live" : "IBT", Task.CurrentId);
+
+                var task = IsOnlineMode ?
+                    ProcessLiveData(ct) :
+                    ProcessIbtData(ct);
+
+                task?.ConfigureAwait(false);
+
+                // complete the session info channel. there will be no more data
+                _internalSessionInfoChannel.Writer.Complete();
+
+                return await task;
+
+            }, ct);
+
+            return _dataProcessingTask;
         }
 
         public Task<IEnumerable<TelemetryVariable>> GetTelemetryVariables()
         {
-            // use local unsafe function to get the varHeaders
-            unsafe IEnumerable<TelemetryVariable> unsafeInternal()
+            try
             {
-                var list = new List<TelemetryVariable>();
-                foreach (var vh in _dataProvider.GetVarHeaders()!.Values)
+                // use local unsafe function to get the varHeaders
+                unsafe IEnumerable<TelemetryVariable> unsafeInternal()
                 {
-                    var tVar = new TelemetryVariable
+                    var list = new List<TelemetryVariable>();
+                    var varHeaders = _dataProvider.GetVarHeaders();
+
+                    if (varHeaders == null)
                     {
-                        Type = vh.type switch
+                        _logger.LogWarning("Variable headers are null, returning empty list");
+                        return list;
+                    }
+
+                    foreach (var vh in varHeaders.Values)
+                    {
+                        try
                         {
-                            irsdk_VarType.irsdk_char => vh.count > 1 ? typeof(string[]) : typeof(string),
-                            irsdk_VarType.irsdk_bool => vh.count > 1 ? typeof(bool[]) : typeof(bool),
-                            irsdk_VarType.irsdk_int => vh.count > 1 ? typeof(int[]) : typeof(int),
-                            irsdk_VarType.irsdk_bitField => vh.count > 1 ? typeof(uint[]) : typeof(uint),
-                            irsdk_VarType.irsdk_float => vh.count > 1 ? typeof(float[]) : typeof(float),
-                            irsdk_VarType.irsdk_double => vh.count > 1 ? typeof(double[]) : typeof(double),
-                            _ => throw new NotImplementedException($"{vh.type}, not implemented")
-                        },
+                            var tVar = new TelemetryVariable
+                            {
+                                Type = vh.type switch
+                                {
+                                    irsdk_VarType.irsdk_char => vh.count > 1 ? typeof(string[]) : typeof(string),
+                                    irsdk_VarType.irsdk_bool => vh.count > 1 ? typeof(bool[]) : typeof(bool),
+                                    irsdk_VarType.irsdk_int => vh.count > 1 ? typeof(int[]) : typeof(int),
+                                    irsdk_VarType.irsdk_bitField => vh.count > 1 ? typeof(uint[]) : typeof(uint),
+                                    irsdk_VarType.irsdk_float => vh.count > 1 ? typeof(float[]) : typeof(float),
+                                    irsdk_VarType.irsdk_double => vh.count > 1 ? typeof(double[]) : typeof(double),
+                                    _ => throw new NotImplementedException($"{vh.type} not implemented")
+                                },
 
-                        Length = vh.count,
-                        IsTimeValue = vh.countAsTime,
-                        Name = Marshal.PtrToStringAnsi((nint)vh.name) ?? string.Empty,
-                        Desc = Marshal.PtrToStringAnsi((nint)vh.desc) ?? string.Empty,
-                        Units = Marshal.PtrToStringAnsi((nint)vh.unit) ?? string.Empty,
-                    };
-                    list.Add(tVar);
+                                Length = vh.count,
+                                IsTimeValue = vh.countAsTime,
+                                Name = Marshal.PtrToStringAnsi((nint)vh.name) ?? string.Empty,
+                                Desc = Marshal.PtrToStringAnsi((nint)vh.desc) ?? string.Empty,
+                                Units = Marshal.PtrToStringAnsi((nint)vh.unit) ?? string.Empty,
+                            };
+                            list.Add(tVar);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Error processing telemetry variable header");
+                            // Continue processing other variables
+                        }
+                    }
+                    return list;
                 }
-                return list;
-            }
 
-            var sortedList = unsafeInternal().OrderBy(v => v.Name) as IEnumerable<TelemetryVariable>;
-            return Task.FromResult(sortedList);
+                var sortedList = unsafeInternal().OrderBy(v => v.Name) as IEnumerable<TelemetryVariable>;
+                return Task.FromResult(sortedList);
+            }
+            catch (ObjectDisposedException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving telemetry variables");
+                throw;
+            }
         }
 
         public string GetRawTelemetrySessionInfoYaml()
         {
-            return _dataProvider.GetSessionInfoYaml();
+            try
+            {
+                return _dataProvider.GetSessionInfoYaml();
+            }
+            catch (ObjectDisposedException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving raw session info YAML");
+                throw;
+            }
         }
         public bool IsConnected()
         {
-            if (_isInitialized)
+            try
             {
-                var isConnected = _dataProvider.IsConnected;
-                return isConnected;
+                if (_isInitialized)
+                {
+                    return _dataProvider.IsConnected;
+                }
+                return false;
             }
-            return false;
+            catch (ObjectDisposedException)
+            {
+                return false;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error checking connection status");
+                return false;
+            }
         }
 
-        public void Pause() => _isPaused = true;
-        public void Resume() => _isPaused = false;
+        public void Pause()
+        {
+            _isPaused = true;
+            _logger.LogDebug("Telemetry client paused");
+        }
+
+        public void Resume()
+        {
+            _isPaused = false;
+            _logger.LogDebug("Telemetry client resumed");
+        }
 
         public void Dispose()
         {
-            Dispose(true);
-            GC.SuppressFinalize(this);
+            DisposeAsync().GetAwaiter().GetResult();
         }
-        private async Task Shutdown()
+
+        public async ValueTask DisposeAsync()
         {
-            _logger.LogDebug("Shutting down");
+            if (_disposed) return;
             try
             {
-                await _task!.ConfigureAwait(false);
-
-                //Uninitialize();
-
-                if (_dataProvider != null)
-                {
-                    _dataProvider.Dispose();
-                }
+                await ShutdownAsync();
+                GC.SuppressFinalize(this);
             }
-            catch (Exception e)
+            catch (Exception ex)
             {
-                _logger.LogError(e, "Shutdown() error");
+                _logger.LogError(ex, "Error during disposal");
+                throw;
+            }
+            finally
+            {
+                _disposed = true;
             }
         }
 
-        protected virtual async void Dispose(bool disposing)
+        private async Task ShutdownAsync()
         {
-            if (disposing)
+            _logger.LogDebug("Shutting down");
+
+            Exception? shutdownException = null;
+
+            try
             {
-                await Shutdown().ConfigureAwait(false);
+                _logger.LogDebug("Monitor completion - Channel states: " +
+                    "ConnectState={connectStateCount}, " +
+                    "Error={errorCount}, " +
+                    "RawSessionData={rawSessionCount}, " +
+                    "SessionData={sessionCount}, " +
+                    "TelemetryData={telemetryCount}",
+                    _connectStateChannel.Reader.Count,
+                    _errorChannel.Reader.Count,
+                    _rawSessionDataChannel.Reader.Count,
+                    _sessionDataChannel.Reader.Count,
+                    _telemetryDataChannel.Reader.Count);
+
+                var shutdownTimeoutToken = new CancellationTokenSource(TimeSpan.FromSeconds(10)).Token;
+
+                // shut down processing tasks
+                await _dataProcessingTask;
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected during cancellation
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error shutting down main processing task");
+                shutdownException ??= ex;
+            }
+
+            CompleteAllChannels();
+
+            // Dispose services
+            _dataProvider?.Dispose();
+            _metricsService?.Dispose();
+
+            _logger.LogDebug("Shutdown completed");
+
+            if (shutdownException != null)
+            {
+                throw shutdownException;
+            }
+        }
+
+        private void CompleteAllChannels()
+        {
+            try
+            {
+                _connectStateChannel.Writer.Complete();
+                _errorChannel.Writer.Complete();
+                _rawSessionDataChannel.Writer.Complete();
+                _sessionDataChannel.Writer.Complete();
+                _telemetryDataChannel.Writer.Complete();
+                //_internalSessionInfoChannel.Writer.TryComplete();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error completing channels");
             }
         }
         ~TelemetryClient()
         {
-            Dispose(false);
+            if (!_disposed)
+            {
+                _logger?.LogWarning("TelemetryClient was not properly disposed. Use 'using' or 'async using' statements.");
+            }
         }
         private bool IsOnlineMode => _ibtOptions == null;
-        Task UpdateSession(string rawSessionInfoYaml)
+
+        private async Task ProcessSessionInfoChannelAsync(CancellationToken ct)
         {
-            var task = Task.Run(() => UpdateSessionHelper(rawSessionInfoYaml));
-            return task;
-        }
-        void UpdateSessionHelper(string rawSessionInfoYaml)
-        {
-            var sw = new Stopwatch();
-            sw.Start();
+            _logger.LogDebug("Session info processor started");
 
             try
             {
-                var parseResult = _sessionInfoParser.Parse<TelemetrySessionInfo>(rawSessionInfoYaml);
-                var sessionTelemetryInfo = parseResult.Model;
-                _logger.LogDebug("sessionInfo deserialize complete. required {attempts} attempts. ({elapsed}ms)", parseResult.ParseAttemptsRequired, sw.ElapsedMilliseconds);
+                await foreach (var rawYaml in _internalSessionInfoChannel.Reader.ReadAllAsync(ct))
+                {
+                    try
+                    {
+                        _rawSessionDataChannel.Writer.TryWrite(rawYaml);
 
-                // send event
-                OnSessionInfoUpdate?.Invoke(this, sessionTelemetryInfo);
+                        var sessionInfo = ParseSessionInfo(rawYaml);
+                        if (sessionInfo != null)
+                        {
+                            _sessionDataChannel.Writer.TryWrite(sessionInfo);
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        _logger.LogError(e, "Error processing session info");
+                        _errorChannel.Writer.TryWrite(new ExceptionEventArgs(e));
+                    }
+                }
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                _logger.LogDebug("Session info processor cancelled");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error in session info processor");
+
+                // write error to channel 
+                _errorChannel?.Writer.TryWrite(new ExceptionEventArgs(ex));
+                throw;
+            }
+
+            _logger.LogDebug("Session info processor ended");
+        }
+
+        private TelemetrySessionInfo? ParseSessionInfo(string rawSessionInfoYaml)
+        {
+            using var timer = new ScopeTimeSpanTimer(elapsed => _metricsService?.SessionInfo.ProcessingDuration(elapsed));
+            using var counter = new ScopeLambda(() => _metricsService?.SessionInfo.RecordsProcessed(1));
+
+            TelemetrySessionInfo? sessionInfo = null;
+            try
+            {
+                Stopwatch sw = Stopwatch.StartNew();
+
+                var parseResult = _sessionInfoParser.Parse<TelemetrySessionInfo>(rawSessionInfoYaml);
+                sessionInfo = parseResult.Model;
+                _logger.LogDebug("sessionInfo deserialize complete. required {attempts} attempts. ({ScopeTimeSpanTimer}ms)", parseResult.ParseAttemptsRequired, sw.ElapsedMilliseconds);
             }
             catch (Exception e)
             {
                 _logger.LogError(e, "error deserializing or sending sessionTelemetryInfo event");
-                OnError?.Invoke(this, new ExceptionEventArgs(e));
+                _errorChannel.Writer.TryWrite(new ExceptionEventArgs(e));
             }
-            _logger.LogDebug("UpdateSession complete ({elapsed}ms)", sw.ElapsedMilliseconds);
+            return sessionInfo;
         }
 
         private bool Initialize()
@@ -292,31 +553,43 @@ namespace SVappsLAB.iRacingTelemetrySDK
 
         private async Task<int> ProcessLiveData(CancellationToken ct)
         {
-            while (!ct.IsCancellationRequested)
+            try
             {
-                try
+                while (!ct.IsCancellationRequested)
                 {
-                    await WaitForData(ct).ConfigureAwait(false);
-                }
-                catch (TaskCanceledException)
-                {
-                    _logger.LogDebug("monitoring cancelled");
-                    return -1;
-                }
-                catch (Exception e)
-                {
-                    _logger.LogError(e, "error processing live data");
-                    OnError?.Invoke(this, new ExceptionEventArgs(e));
-                    throw;
+                    try
+                    {
+                        await WaitForData(ct).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                    {
+                        _logger.LogDebug("Live data monitoring cancelled");
+                        return -1;
+                    }
+                    catch (Exception e)
+                    {
+                        _logger.LogError(e, "Error processing live data");
+                        _errorChannel.Writer.TryWrite(new ExceptionEventArgs(e));
+
+                        // For other exceptions, wait a bit before retrying
+                        await Task.Delay(1000, ct).ConfigureAwait(false);
+                    }
                 }
             }
-            _logger.LogInformation("dataMonitor stopping");
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                _logger.LogDebug("Live data processing cancelled");
+            }
+
+            _logger.LogInformation("Live data monitor stopping");
             return -1;
         }
 
-        Task _sessionInfoProcessingTask = Task.CompletedTask;
         private async Task WaitForData(CancellationToken ct)
         {
+            // Check cancellation early
+            ct.ThrowIfCancellationRequested();
+
             // ensure initialization
             if (!_isInitialized && !Initialize())
             {
@@ -332,8 +605,8 @@ namespace SVappsLAB.iRacingTelemetrySDK
             {
                 _logger.LogDebug("isConnected changed from {lastState} to {currState}", _lastConnectionStatus, isConnected);
 
-                // inform listeners of connection state change
-                OnConnectStateChanged?.Invoke(this, new ConnectStateChangedEventArgs { State = isConnected ? ConnectState.Connected : ConnectState.Disconnected });
+                // write connection state change to channel if not disposed
+                _connectStateChannel.Writer.TryWrite(new ConnectStateChangedEventArgs { State = isConnected ? ConnectState.Connected : ConnectState.Disconnected });
 
                 _lastConnectionStatus = isConnected;
             }
@@ -345,62 +618,40 @@ namespace SVappsLAB.iRacingTelemetrySDK
                 return;
             }
 
-            // if new session info, send event 
+            // if new session info, queue for processing
             if (_dataProvider.IsSessionInfoUpdated())
             {
-                var rawSessionInfoYaml = _dataProvider.GetSessionInfoYaml();
-
-                // suppress events if paused
                 if (!_isPaused)
                 {
-                    // if anyone wants raw yaml, send it
-                    if (OnRawSessionInfoUpdate != null)
-                    {
-                        OnRawSessionInfoUpdate.Invoke(this, rawSessionInfoYaml);
-                    }
-
-                    if (OnSessionInfoUpdate != null)
-                    {
-                        if (!_sessionInfoProcessingTask.IsCompleted)
-                        {
-                            _logger.LogWarning("sessionInfo processing task is still running");
-                        }
-                        _sessionInfoProcessingTask = UpdateSession(rawSessionInfoYaml);
-                    }
+                    var rawSessionInfoYaml = _dataProvider.GetSessionInfoYaml();
+                    _internalSessionInfoChannel.Writer.TryWrite(rawSessionInfoYaml);
                 }
             }
 
-            // wait for new telemetry data
-            var signaled = _dataProvider.WaitForDataReady(TimeSpan.FromMilliseconds(DATA_READY_TIMEOUT_MS));
+            // wait for new telemetry data with cancellation support
+            var signaled = await Task.Run(() => _dataProvider.WaitForDataReady(TimeSpan.FromMilliseconds(DATA_READY_TIMEOUT_MS)), ct).ConfigureAwait(false);
             if (!signaled)
             {
                 // no new data, return and try again
                 return;
             }
 
-            // suppress events if paused
+            // suppress events if paused or disposed
             if (!_isPaused)
             {
-                // send event if we have a listener
-                if (OnTelemetryUpdate != null)
-                {
-                    var telemetryData = GetTelemetryDataSample();
-
-                    OnTelemetryUpdate.Invoke(this, telemetryData);
-                }
+                // write to channel
+                var telemetryData = GetTelemetryDataSample();
+                _telemetryDataChannel.Writer.TryWrite(telemetryData);
             }
         }
 
         private T GetTelemetryDataSample()
         {
-            var parameterValues = _telemetryDataConstructorParameters
-                .Select(p =>
-                {
-                    var val = _dataProvider.GetVarValue(p.Name!);
-                    return val;
-                });
-            var telemetryData = (T)_telemetryDataConstructorInfo.Invoke(parameterValues.ToArray());
-            return telemetryData;
+            using var elapsedTimer = new ScopeTimeSpanTimer(elapsed => _metricsService?.Telemetry.ProcessingDuration(elapsed));
+            using var counter = new ScopeLambda(() => _metricsService?.Telemetry.RecordsProcessed(1));
+
+            T val = _telemetryAccessor.CreateTelemetryDataSample(_dataProvider);
+            return val;
         }
         private async Task<int> ProcessIbtData(CancellationToken token)
         {
@@ -408,34 +659,31 @@ namespace SVappsLAB.iRacingTelemetrySDK
 
             try
             {
+                // Check cancellation before starting
+                token.ThrowIfCancellationRequested();
+
                 var sw = new Stopwatch();
                 sw.Start();
 
                 _dataProvider.OpenDataSource();
 
-                // send connect event
-                OnConnectStateChanged?.Invoke(this, new ConnectStateChangedEventArgs { State = ConnectState.Connected });
+                _connectStateChannel.Writer.TryWrite(new ConnectStateChangedEventArgs { State = ConnectState.Connected });
 
                 // update and send session info event
                 if (_dataProvider.IsSessionInfoUpdated())
                 {
-                    // suppress events if paused
                     if (!_isPaused)
                     {
-
                         var rawSessionInfoYaml = _dataProvider.GetSessionInfoYaml();
-                        if (OnRawSessionInfoUpdate != null)
-                        {
-                            OnRawSessionInfoUpdate.Invoke(this, rawSessionInfoYaml);
-                        }
-                        if (OnSessionInfoUpdate != null)
-                        {
-                            await UpdateSession(rawSessionInfoYaml).ConfigureAwait(false);
-                        }
+                        _internalSessionInfoChannel.Writer.TryWrite(rawSessionInfoYaml);
                     }
                 }
 
-                // loop until we are at eof or cancelled
+                // Process with respect for playback speed multiplier
+                var playbackDelay = _ibtOptions?.PlayBackSpeedMultiplier == int.MaxValue ? TimeSpan.Zero :
+                    TimeSpan.FromMilliseconds(16.67 / (_ibtOptions?.PlayBackSpeedMultiplier ?? 1)); // ~60 FPS base rate
+
+                // loop until we are at eof, cancelled, or shutdown requested
                 for (numRecords = 0; !token.IsCancellationRequested; numRecords++)
                 {
                     var dataAvailable = _dataProvider.WaitForDataReady(TimeSpan.Zero);
@@ -444,34 +692,51 @@ namespace SVappsLAB.iRacingTelemetrySDK
                         break;
                     }
 
-                    // suppress events if paused
+                    // suppress events if paused or disposed
                     if (!_isPaused)
                     {
-                        // send event if we have a listener
-                        if (OnTelemetryUpdate != null && !_isPaused)
-                        {
-                            var telemetryData = GetTelemetryDataSample();
-                            OnTelemetryUpdate.Invoke(this, telemetryData);
-                        }
+                        // write to channel
+                        var telemetryData = GetTelemetryDataSample();
+                        _telemetryDataChannel.Writer.TryWrite(telemetryData);
+                    }
+
+                    // Apply playback speed delay if configured
+                    if (playbackDelay > TimeSpan.Zero)
+                    {
+                        await Task.Delay(playbackDelay, token).ConfigureAwait(false);
+                    }
+
+                    // Yield periodically for responsive cancellation
+                    if (numRecords % 100 == 0)
+                    {
+                        await Task.Yield();
+                        token.ThrowIfCancellationRequested();
                     }
                 }
 
                 sw.Stop();
-                var recsPerSec = Math.Round(numRecords / sw.ElapsedMilliseconds * 1000f, 1);
-                var minsOfData = Math.Round(numRecords / 60f / 60f);
-                _logger.LogInformation("processed {_numRecords} IBT telemetry records ({minsOfData} mins worth of session data), in {milliseconds}ms. ({rate} recs/sec)", numRecords, minsOfData, sw.ElapsedMilliseconds, recsPerSec);
+                var recsPerSec = Math.Round(numRecords / (sw.ElapsedMilliseconds + 1) * 1000f, 1); // +1 to avoid division by zero
+                var minsOfData = Math.Round(numRecords / 60f / 60f, 2);
+                _logger.LogInformation("processed {numRecords} IBT telemetry records ({minsOfData} mins worth of session data), in {milliseconds}ms. ({rate} recs/sec)", numRecords, minsOfData, sw.ElapsedMilliseconds, recsPerSec);
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                _logger.LogDebug("IBT data processing cancelled after {numRecords} records", numRecords);
             }
             catch (Exception e)
             {
-                _logger.LogError(e, "error playing ibt file");
-                OnError?.Invoke(this, new ExceptionEventArgs(e));
+                _logger.LogError(e, "Error playing IBT file after {numRecords} records", numRecords);
+                _errorChannel.Writer.TryWrite(new ExceptionEventArgs(e));
                 throw;
             }
             finally
             {
-                // send disconnect event
-                OnConnectStateChanged?.Invoke(this, new ConnectStateChangedEventArgs { State = ConnectState.Disconnected });
+                _connectStateChannel.Writer.TryWrite(new ConnectStateChangedEventArgs { State = ConnectState.Disconnected });
             }
+
+            // special case for IBT files. when we reach the end of the file, we need to cancel the session info processor
+            _sessionInfoProcessingCTS?.Cancel();
+
             return numRecords;
         }
 

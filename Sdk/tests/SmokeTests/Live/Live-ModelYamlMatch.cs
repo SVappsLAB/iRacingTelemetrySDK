@@ -1,12 +1,12 @@
 /**
  * Copyright (C) 2024-2025 Scott Velez
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -14,23 +14,18 @@
  * limitations under the License.using Microsoft.CodeAnalysis;
 **/
 
-using System.Collections.Generic;
+using Microsoft.Extensions.Logging.Abstractions;
+using SVappsLAB.iRacingTelemetrySDK;
 
-#nullable disable
-namespace SVappsLAB.iRacingTelemetrySDK
+namespace SmokeTests;
+public partial class Live : Base<Live>
 {
-    public class TelemetrySessionInfo
+    const int TIMEOUT_SECS = 5;
+
+    [Fact]
+    public async Task VerifyModelMatchesRawYaml()
     {
-        public WeekendInfo WeekendInfo { get; set; }
-        public SessionInfo SessionInfo { get; set; }
-        public QualifyResultsInfo QualifyResultsInfo { get; set; }
-        public CameraInfo CameraInfo { get; set; }
-        public RadioInfo RadioInfo { get; set; }
-        public DriverInfo DriverInfo { get; set; }
-        public SplitTimeInfo SplitTimeInfo { get; set; }
-        public Dictionary<string, object> CarSetup { get; set; }
+        var client = TelemetryClient<TelemetryData>.Create(NullLogger.Instance);
+        await BaseVerifyModelMatchesRawYaml(client, TIMEOUT_SECS);
     }
-
 }
-#nullable enable
-

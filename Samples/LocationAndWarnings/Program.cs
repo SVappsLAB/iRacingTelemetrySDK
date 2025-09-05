@@ -21,7 +21,12 @@ namespace LocationAndWarnings
 {
 
     // these are the telemetry variables we want to track
-    [RequiredTelemetryVars(["enginewarnings", "IsOnTrack", "PlayerTrackSurface", "PlayerTrackSurfaceMaterial"])]
+    [RequiredTelemetryVars([
+        TelemetryVar.EngineWarnings,
+        TelemetryVar.IsOnTrack,
+        TelemetryVar.PlayerTrackSurface,
+        TelemetryVar.PlayerTrackSurfaceMaterial
+        ])]
     internal class Program
     {
         // pass the IBT file you want to analyze
@@ -43,43 +48,57 @@ namespace LocationAndWarnings
             // create telemetry client
             using var tc = TelemetryClient<TelemetryData>.Create(logger, ibtOptions);
 
-            // subscribe to telemetry updates
-            tc.OnTelemetryUpdate += OnTelemetryUpdate;
+            // use cancellation token for proper shutdown
+            using var cts = new CancellationTokenSource();
+
+            // start telemetry consumption
+            var telemetryTask = Task.Run(async () =>
+            {
+                await foreach (var data in tc.TelemetryDataStream.ReadAllAsync(cts.Token))
+                {
+                    OnTelemetryUpdate(data);
+                }
+            }, cts.Token);
 
             // start monitoring telemetry - press ctrl-c to exit
-            await tc.Monitor(CancellationToken.None);
+            var monitorTask = tc.Monitor(cts.Token);
+
+            // wait for either task to complete
+            await Task.WhenAny(monitorTask, telemetryTask);
             logger.LogInformation("done");
 
 
-            void OnTelemetryUpdate(object? sender, TelemetryData e)
+            void OnTelemetryUpdate(TelemetryData e)
             {
                 // slow things down, only output information every 2 seconds
                 if ((counter++ % (2 * 60f)) != 0)
                     return;
 
                 // figure out where the car is, and what the track surface is
-                var trackSurface = Enum.GetName(e.PlayerTrackSurface);
-                var trackSurfaceMaterial = Enum.GetName(e.PlayerTrackSurfaceMaterial);
+                var trackSurface = e.PlayerTrackSurface.ToString();
+                var trackSurfaceMaterial = e.PlayerTrackSurfaceMaterial.ToString();
 
                 // engine warnings
                 var engineWarnings = GetEngineWarnings(e.EngineWarnings);
 
-                //  EngineWarnings,Boolean IsOnTrack,Int32 PlayerTrackSurface,Int32 PlayerTrackSurfaceMaterial,Int32 TrackWetness);
                 var message = $"OnTrack:({e.IsOnTrack}), TrackSurface:({trackSurface}), TrackSurfaceMaterial:({trackSurfaceMaterial}), EngineWarnings:({engineWarnings})";
                 logger.LogInformation(message);
             }
 
-            string GetEngineWarnings(EngineWarnings engineWarnings)
+            string GetEngineWarnings(EngineWarnings? engineWarnings)
             {
                 var warnings = new List<string>();
-                foreach (var flag in Enum.GetValues<EngineWarnings>())
+                if (engineWarnings.HasValue)
                 {
-                    // check if the flag is set
-                    if (engineWarnings.HasFlag(flag))
+                    foreach (var flag in Enum.GetValues<EngineWarnings>())
                     {
-                        var flagName = Enum.GetName(flag);
-                        if (!string.IsNullOrEmpty(flagName))
-                            warnings.Add(flagName);
+                        // check if the flag is set
+                        if ((engineWarnings.Value & flag) == flag)
+                        {
+                            var flagName = flag.ToString();
+                            if (!string.IsNullOrEmpty(flagName))
+                                warnings.Add(flagName);
+                        }
                     }
                 }
                 return string.Join(",", warnings);

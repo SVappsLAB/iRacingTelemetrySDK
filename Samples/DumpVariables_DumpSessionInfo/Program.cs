@@ -16,11 +16,10 @@
 
 using Microsoft.Extensions.Logging;
 using SVappsLAB.iRacingTelemetrySDK;
-using SVappsLAB.iRacingTelemetrySDK.Models;
 
 namespace DumpVariables_DumpSessionInfo
 {
-    [RequiredTelemetryVars(["rpm"])]
+    [RequiredTelemetryVars([TelemetryVar.RPM])]
     internal class Program
     {
 
@@ -47,12 +46,22 @@ namespace DumpVariables_DumpSessionInfo
 
             logger.LogInformation("pulling data from \'{source}\'", ibtOptions != null ? "IBT file session" : "Live iRacing session");
 
-            // create telemetry client  and subscribe
+            // create telemetry client
             using var tc = TelemetryClient<TelemetryData>.Create(logger, ibtOptions);
-            tc.OnConnectStateChanged += OnConnectStateChanged;
-            tc.OnRawSessionInfoUpdate += OnRawSessionInfoUpdate;
 
-            // startTime monitoring - exit when we receive the session info event 
+            // Note: ConnectStateStream is not available in published NuGet package yet
+            // For now, we'll get telemetry variables when we successfully get data
+
+            // Start raw session info consumption
+            var rawSessionTask = Task.Run(async () =>
+            {
+                await foreach (var rawYaml in tc.RawSessionDataStream.ReadAllAsync(cts.Token))
+                {
+                    OnRawSessionInfoUpdate(rawYaml);
+                }
+            }, cts.Token);
+
+            // Start monitoring - exit when we receive the session info
             var monitorTask = tc.Monitor(cts.Token);
 
             DateTime startTime = DateTime.Now;
@@ -63,7 +72,7 @@ namespace DumpVariables_DumpSessionInfo
                     // save telemetryVariables to file
                     writeVariablesFile(telemetryVariables);
 
-                    // save sessinInfo yaml to file
+                    // save sessionInfo yaml to file
                     writeSessionInfoFile(rawSessionInfoYaml);
 
                     // now that we have both 'telemetryVariables' and 'sessionInfo'
@@ -72,27 +81,33 @@ namespace DumpVariables_DumpSessionInfo
                     break;
                 }
 
+                // Get telemetry variables if we haven't already and client is connected
+                if (telemetryVariables == null && tc.IsConnected())
+                {
+                    try
+                    {
+                        telemetryVariables = await tc.GetTelemetryVariables();
+                    }
+                    catch
+                    {
+                        // Ignore errors, we'll try again
+                    }
+                }
+
                 logger.LogInformation("waiting for telemetry data... {elapsed} secs", (DateTime.Now - startTime).TotalSeconds.ToString("F1"));
                 await Task.Delay(TimeSpan.FromSeconds(1));
             }
 
             // wait for 2 seconds to exit
-            bool success = monitorTask.Wait(2 * 1000);
-            logger.LogInformation("Done. Status: {status}", success ? "successful" : "timeout-" + monitorTask.Status);
+            bool success = await Task.WhenAny(monitorTask, rawSessionTask) == monitorTask ?
+                monitorTask.Wait(2 * 1000) :
+                rawSessionTask.Wait(2 * 1000);
+            logger.LogInformation("Done. Status: {status}", success ? "successful" : "timeout");
 
 
-            // connection event handler
-            void OnConnectStateChanged(object? _sender, ConnectStateChangedEventArgs e)
-            {
-                // if we already have the telemetryVariables, no more work to do
-                if (telemetryVariables != null)
-                    return;
 
-                telemetryVariables = tc.GetTelemetryVariables().Result;
-            }
-
-            // raw sessionInfo event handler
-            void OnRawSessionInfoUpdate(object? sender, string sessionInfoYaml)
+            // raw sessionInfo handler
+            void OnRawSessionInfoUpdate(string sessionInfoYaml)
             {
                 // if we already have the rawSessionInfoYaml, no more work to do
                 if (rawSessionInfoYaml != null)

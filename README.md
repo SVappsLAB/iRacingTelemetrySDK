@@ -9,12 +9,14 @@
 - **Playback of saved IBT Telemetry Data:** In addition to live data access, the SDK can read previously saved iRacing IBT files and play them back as if it were live data, using the same API.
 This allows you to analyze and process historical telemetry data, the same way you would with live data.
 
-- **Strongly Typed Telemetry Data**: Source Generation is used to create strongly typed iRacing variables, such as Floats (speed, rpm) and Enums (track surface, pit service state).
+- **Strongly Typed Telemetry Data**: Source Generation creates strongly typed iRacing variables with nullable properties that accurately reflect iRacing's dynamic variable availability model.
 
-- **Optimized Performance:** The SDK uses techniques such as asynchronous Task's, ref struct's and ReadOnlySpan's to minimize memory allocations and maximize performance.
-When processing IBT files for example, the SDK is able to process 1 hour of saved telemetry data in under 1/2 second. A rate of over 300,000 telemetry records/sec.
+- **High-Performance Architecture:** The SDK uses channel-based data streaming, expression trees, and lock-free data structures to maximize performance.
+When processing IBT files, the SDK can process over one-half million telemetry records/sec - double the previous performance.
 
 - **Pause and Resume:** Control telemetry event firing with `Pause()` and `Resume()` methods. Background processing continues while paused, but events are suppressed until resumed.
+
+- **Built-in Metrics:** Integrated System.Diagnostics.Metrics support provides detailed performance monitoring of telemetry processing, including throughput, processing duration, and dropped records.
 
 ## Telemetry Variables
 
@@ -30,6 +32,8 @@ Once you know what variables are available and you have the list of which ones y
 
 ## Getting Started
 
+> ⚠️ **v1.0+ Breaking Changes**: This version introduces significant API changes with enum-based variable identification and channel-based data streaming. If upgrading from a previous version, see [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md) for detailed migration instructions.
+
 To incorporate **iRacingTelemetrySDK** into your projects, follow these steps:
 
 > 📚 **For comprehensive documentation and advanced usage patterns**, see [AI_CONTEXT.md](./AI_CONTEXT.md) - a detailed guide designed for developers and AI coding assistants.
@@ -42,11 +46,11 @@ To incorporate **iRacingTelemetrySDK** into your projects, follow these steps:
 
 1. Add the **RequiredTelemetryVars** attribute to the main class of your project
 
-    The attribute takes an array of strings.  The string values, are the name of the iRacing telemetry variables you want to use in your program.
+    The attribute takes an array of TelemetryVar enum values. These enum values identify the iRacing telemetry variables you want to use in your program.
 
     ```csharp
     // these are the telemetry variables we want to track
-    [RequiredTelemetryVars(["isOnTrackCar", "rpm", "speed", "PlayerTrackSurface"])]
+    [RequiredTelemetryVars([TelemetryVar.IsOnTrackCar, TelemetryVar.RPM, TelemetryVar.Speed, TelemetryVar.PlayerTrackSurface])]
 
     internal class Program
     {
@@ -57,7 +61,13 @@ To incorporate **iRacingTelemetrySDK** into your projects, follow these steps:
     A source generator will be leveraged to create a new .Net `TelemetryData` type you can use in your code.  For the attribute above, the created type will look like
 
     ```csharp
-    public record struct TelemetryData(Boolean IsOnTrackCar,Single RPM,Single Speed, irsdk_TrkLoc PlayerTrackSurface);
+    public record struct TelemetryData
+    {
+        public bool? IsOnTrackCar { get; init; }
+        public float? RPM { get; init; }
+        public float? Speed { get; init; }
+        public irsdk_TrkLoc? PlayerTrackSurface { get; init; }
+    }
     ```
 1. Create an instance of the TelemetryClient
 
@@ -80,30 +90,121 @@ To incorporate **iRacingTelemetrySDK** into your projects, follow these steps:
 	using var tc = TelemetryClient<TelemetryData>.Create(logger, ibtOptions);
 	```
 
-1. Add an event handler
+1. Subscribe to data streams
 
-    The event handler will be called with the latest telemetry data.
+    The new channel-based API provides data streams for different types of telemetry information.
     
     ```csharp
-    // event handler
-    void OnTelemetryUpdate(object? _sender, TelemetryData e)
+    // Subscribe to all data streams with delegate methods for simplified consumption
+    var subscriptionTask = client.SubscribeToAllStreamsAsync(
+        onTelemetryUpdate: OnTelemetryUpdate,
+        onSessionInfoUpdate: OnSessionInfoUpdate,
+        onConnectStateChanged: OnConnectStateChanged,
+        onError: OnError,
+        cancellationToken: cts.Token);
+
+    // Event handler methods
+    static void OnTelemetryUpdate(TelemetryData data)
     {
-        // do something with the telemetry data
-        logger.LogInformation("rpm: {rpm}, speed: {speed}, track surface: {trksuf}", e.RPM, e.Speed, e.PlayerTrackSurface);
+        // Note: Properties are nullable, use conditional operators or check for null
+        logger.LogInformation("rpm: {rpm}, speed: {speed}, track surface: {trksuf}", 
+            data.RPM, data.Speed, data.PlayerTrackSurface);
+    }
+    
+    static void OnSessionInfoUpdate(TelemetrySessionInfo session)
+    {
+        var driverCount = session.DriverInfo?.Drivers?.Count ?? 0;
+        logger.LogInformation("Drivers in session: {count}", driverCount);
+    }
+    
+    static void OnConnectStateChanged(ConnectStateChangedEventArgs state)
+    {
+        logger.LogInformation("Connection state: {state}", state.State);
+    }
+    
+    static void OnError(ExceptionEventArgs error)
+    {
+        logger.LogError(error.Exception, "SDK Error occurred");
     }
     ```
 
-1. Monitor for telemetry data changes
+1. Monitor for data changes
 
-    Once monitoring is initiated, the events will fire and your event handlers will be called.<br>
-    Monitoring is stopped, when the `CancellationToken` is cancelled, or the when the end-of-file is reached when processing a IBT file.
+    The client runs two concurrent tasks: monitoring telemetry data and consuming the data streams.<br>
+    Monitoring stops when the `CancellationToken` is cancelled (or when end-of-file is reached for IBT files).
 
     ```csharp
-    CancellationTokenSource cts = new new CancellationTokenSource();
+    using var cts = new CancellationTokenSource();
 
-    // start monitoring the telemetry
-    await tc.Monitor(cts.Token);
+    // Enable graceful shutdown with Ctrl+C
+    Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
+
+    // Start both monitoring and subscription tasks concurrently
+    await Task.WhenAny(tc.Monitor(cts.Token), subscriptionTask);
     ```
+
+## Performance Monitoring
+
+The SDK includes built-in support for System.Diagnostics.Metrics to help monitor performance and diagnose issues.
+
+### Available Metrics
+
+The SDK exposes several metrics automatically:
+
+- **telemetry_records_processed_total**: Counter of processed telemetry records
+- **telemetry_records_dropped_total**: Counter of dropped records (when channels are full)
+- **telemetry_processing_duration_microseconds**: Histogram of telemetry processing time
+- **sessioninfo_records_processed_total**: Counter of session info updates processed
+- **sessioninfo_processing_duration_milliseconds**: Histogram of session info processing time
+
+### Enabling Metrics with Dependency Injection
+
+```csharp
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+
+[RequiredTelemetryVars([TelemetryVar.Speed, TelemetryVar.RPM])]
+public class Program
+{
+    public static async Task Main(string[] args)
+    {
+        var host = Host.CreateDefaultBuilder(args)
+            .ConfigureServices((context, services) =>
+            {
+                services.AddMetrics();  // Enable metrics support
+                services.AddLogging(logging => logging.AddConsole());
+            })
+            .Build();
+
+        var logger = host.Services.GetRequiredService<ILogger<Program>>();
+        var meterFactory = host.Services.GetRequiredService<IMeterFactory>();
+
+        // Create client with metrics support
+        var clientOptions = new ClientOptions { MeterFactory = meterFactory };
+        using var client = TelemetryClient<TelemetryData>.Create(logger, clientOptions);
+
+        // Your telemetry code here...
+    }
+}
+```
+
+### Monitoring with dotnet-counters
+
+Use any monitoring tool that supports System.Diagnostics.Metrics, like OpenTelemetry or the free Microsoft provided `dotnet-counters` tool to monitor SDK performance in real-time:
+
+```bash
+# Monitor all SDK metrics for a running application named "YourApp"
+dotnet-counters monitor --name "YourApp" --counters SVappsLAB.iRacingTelemetrySDK
+
+# Sample output:
+# [SVappsLAB.iRacingTelemetrySDK]
+#     telemetry_records_processed_total                    45,231
+#     telemetry_records_dropped_total                           0
+#     sessioninfo_records_processed_total                      12
+```
+
+This helps identify performance bottlenecks, monitor processing rates, and detect if records are being dropped due to slow consumption.
 
 ## Samples
 

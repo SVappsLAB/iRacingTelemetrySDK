@@ -11,26 +11,13 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License.using Microsoft.CodeAnalysis;
+ * limitations under the License.
 **/
 
-using System.Collections.Generic;
-
-#nullable disable
 namespace SVappsLAB.iRacingTelemetrySDK
 {
-    public class TelemetrySessionInfo
+    public static class Constants
     {
-        public WeekendInfo WeekendInfo { get; set; }
-        public SessionInfo SessionInfo { get; set; }
-        public QualifyResultsInfo QualifyResultsInfo { get; set; }
-        public CameraInfo CameraInfo { get; set; }
-        public RadioInfo RadioInfo { get; set; }
-        public DriverInfo DriverInfo { get; set; }
-        public SplitTimeInfo SplitTimeInfo { get; set; }
-        public Dictionary<string, object> CarSetup { get; set; }
+        public const string SDK_NAME = "SVappsLAB.iRacingTelemetrySDK";
     }
-
 }
-#nullable enable
-

@@ -28,8 +28,8 @@ using Microsoft.CodeAnalysis.Text;
 namespace SVappsLAB.iRacingTelemetrySDK
 {
 
-    public record struct VarsToGenerate(VarType[] vars, (string name, Location location)[] duplicates);
-    public record struct VarType(string name, Type type, Location location);
+    public record struct VarsToGenerate(VarType[] vars, (TelemetryVar variable, Location location)[] duplicates);
+    public record struct VarType(TelemetryVar variable, Type type, Location location);
 
     [Generator(LanguageNames.CSharp)]
     public class CodeGenerator : IIncrementalGenerator
@@ -44,9 +44,9 @@ namespace SVappsLAB.iRacingTelemetrySDK
                 [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
                 internal sealed class RequiredTelemetryVarsAttribute : Attribute
                 {
-                    private readonly string[]? _vars;
+                    private readonly TelemetryVar[]? _vars;
 
-                    public RequiredTelemetryVarsAttribute(string[]? vars)
+                    public RequiredTelemetryVarsAttribute(TelemetryVar[]? vars)
                     {
                         _vars = vars;
                     }
@@ -122,9 +122,9 @@ namespace SVappsLAB.iRacingTelemetrySDK
             return attr;
         }
 
-        private List<(string name, Location location)> ExtractVariableLocations(GeneratorAttributeSyntaxContext context, AttributeData attribute)
+        private List<(TelemetryVar variable, Location location)> ExtractVariableLocations(GeneratorAttributeSyntaxContext context, AttributeData attribute)
         {
-            var variableLocations = new List<(string name, Location location)>();
+            var variableLocations = new List<(TelemetryVar variable, Location location)>();
 
             for (int argIndex = 0; argIndex < attribute.ConstructorArguments.Length; argIndex++)
             {
@@ -132,10 +132,11 @@ namespace SVappsLAB.iRacingTelemetrySDK
                 for (int valueIndex = 0; valueIndex < arg.Values.Length; valueIndex++)
                 {
                     var value = arg.Values[valueIndex];
-                    if (value.Value?.ToString() is string varName && !string.IsNullOrEmpty(varName))
+                    if (value.Value is int enumValue && Enum.IsDefined(typeof(TelemetryVar), enumValue))
                     {
+                        var telemetryVar = (TelemetryVar)enumValue;
                         var location = GetVariableLocation(context, argIndex, valueIndex);
-                        variableLocations.Add((varName, location));
+                        variableLocations.Add((telemetryVar, location));
                     }
                 }
             }
@@ -143,10 +144,10 @@ namespace SVappsLAB.iRacingTelemetrySDK
             return variableLocations;
         }
 
-        private (string name, Location location)[] FindDuplicateVariables(List<(string name, Location location)> variableLocations)
+        private (TelemetryVar variable, Location location)[] FindDuplicateVariables(List<(TelemetryVar variable, Location location)> variableLocations)
         {
             var duplicateGroups = variableLocations
-                .GroupBy(x => x.name, StringComparer.OrdinalIgnoreCase)
+                .GroupBy(x => x.variable)
                 .Where(g => g.Count() > 1)
                 .ToArray();
 
@@ -163,30 +164,30 @@ namespace SVappsLAB.iRacingTelemetrySDK
             return duplicatesWithLocations;
         }
 
-        private VarType[] ProcessVariables(List<(string name, Location location)> variableLocations)
+        private VarType[] ProcessVariables(List<(TelemetryVar variable, Location location)> variableLocations)
         {
             var varList = new VarType[variableLocations.Count];
 
             for (int i = 0; i < variableLocations.Count; i++)
             {
-                var (name, location) = variableLocations[i];
-                varList[i] = ProcessSingleVariable(name, location);
+                var (variable, location) = variableLocations[i];
+                varList[i] = ProcessSingleVariable(variable, location);
             }
 
             return varList;
         }
 
-        private VarType ProcessSingleVariable(string rawVariableName, Location location)
+        private VarType ProcessSingleVariable(TelemetryVar variable, Location location)
         {
-            if (_iRacingData.Value.Vars.TryGetValue(rawVariableName, out var varItem))
+            if (_iRacingData.Value.Vars.TryGetValue(variable, out var varItem))
             {
                 var type = GetVariableType(varItem);
-                return new VarType(varItem.Name, type, location);
+                return new VarType(variable, type, location);
             }
             else
             {
                 IncrementCounter(TelemetryConstants.COUNTER_UNKNOWN_VARIABLES);
-                return new VarType(rawVariableName, typeof(Exception), location);
+                return new VarType(variable, typeof(Exception), location);
             }
         }
 
@@ -257,20 +258,20 @@ namespace SVappsLAB.iRacingTelemetrySDK
             }
         }
 
-        private static VarType[] FilterValidVariables(VarType[] values, (string name, Location location)[] duplicates)
+        private static VarType[] FilterValidVariables(VarType[] values, (TelemetryVar variable, Location location)[] duplicates)
         {
-            var duplicateNames = new HashSet<string>(duplicates.Select(d => d.name), StringComparer.OrdinalIgnoreCase);
-            var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var duplicateVariables = new HashSet<TelemetryVar>(duplicates.Select(d => d.variable));
+            var seenVariables = new HashSet<TelemetryVar>();
             var validVariables = new List<VarType>();
 
             foreach (var variable in values)
             {
                 // skip if it's a duplicate or unknown variable
-                if (duplicateNames.Contains(variable.name) || variable.type == typeof(Exception))
+                if (duplicateVariables.Contains(variable.variable) || variable.type == typeof(Exception))
                     continue;
 
-                // skip if we've already seen this name (case-insensitive)
-                if (!seenNames.Add(variable.name))
+                // skip if we've already seen this variable
+                if (!seenVariables.Add(variable.variable))
                     continue;
 
                 validVariables.Add(variable);
@@ -279,11 +280,11 @@ namespace SVappsLAB.iRacingTelemetrySDK
             return validVariables.ToArray();
         }
 
-        private static void ReportDuplicateVariableDiagnostics(SourceProductionContext spc, (string name, Location location)[] duplicates)
+        private static void ReportDuplicateVariableDiagnostics(SourceProductionContext spc, (TelemetryVar variable, Location location)[] duplicates)
         {
-            foreach (var (name, location) in duplicates)
+            foreach (var (variable, location) in duplicates)
             {
-                var diagnostic = CreateDuplicateVariableDiagnostic(name, location);
+                var diagnostic = CreateDuplicateVariableDiagnostic(variable.ToString(), location);
                 spc.ReportDiagnostic(diagnostic);
             }
         }
@@ -294,7 +295,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
             {
                 if (item.type == typeof(Exception))
                 {
-                    var diagnostic = CreateUnknownVariableDiagnostic(item.name, item.location);
+                    var diagnostic = CreateUnknownVariableDiagnostic(item.variable.ToString(), item.location);
                     spc.ReportDiagnostic(diagnostic);
                 }
             }
@@ -308,11 +309,12 @@ namespace SVappsLAB.iRacingTelemetrySDK
                 var item = values[i];
 
                 if (i > 0)
-                    sb.Append(",");
+                    sb.AppendLine();
 
-                var friendlyTypeName = GetFriendlyTypeName(item.type);
-                var varDeclaration = $"{friendlyTypeName} {item.name}";
-                sb.Append(varDeclaration);
+                // Generate property declarations with nullable types
+                var nullableFriendlyTypeName = GetNullableFriendlyTypeName(item.type);
+                var propertyDeclaration = $"        public {nullableFriendlyTypeName} {item.variable} {{ get; init; }}";
+                sb.Append(propertyDeclaration);
             }
             return sb.ToString();
         }
@@ -320,6 +322,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
         private static string GenerateSourceCode(string varList)
         {
             return $$"""
+                #nullable enable
                 using System;
 
                 namespace SVappsLAB.iRacingTelemetrySDK
@@ -327,8 +330,12 @@ namespace SVappsLAB.iRacingTelemetrySDK
                     /// <summary>
                     /// Represents iRacing telemetry data with strongly-typed properties.
                     /// This record is generated based on the RequiredTelemetryVarsAttribute usage.
+                    /// Properties return null when the corresponding telemetry variable is not available.
                     /// </summary>
-                    public record struct TelemetryData({{varList}});
+                    public record struct TelemetryData
+                    {
+                {{varList}}
+                    }
                 }
                 """;
         }
@@ -476,6 +483,14 @@ namespace SVappsLAB.iRacingTelemetrySDK
             }
 
             return TypeNameMappings.TryGetValue(type.Name, out var friendlyName) ? friendlyName : type.Name;
+        }
+
+        private static string GetNullableFriendlyTypeName(Type type)
+        {
+            var baseName = GetFriendlyTypeName(type);
+            
+            // Value types (except arrays) need the ? suffix for nullable
+            return type.IsValueType && !type.IsArray ? $"{baseName}?" : baseName;
         }
 
         // telemetry helpers

@@ -14,6 +14,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "data", "data", "{0C7049E3-E
 		data\formulair04_tsukuba 2kfull 2024-01-09 17-26-10.ibt = data\formulair04_tsukuba 2kfull 2024-01-09 17-26-10.ibt
 	EndProjectSection
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MinimalExample", "MinimalExample\MinimalExample.csproj", "{2EB628A8-8310-4EA2-BC57-50F8EDD8949B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -32,8 +34,15 @@ Global
 		{DE6782F3-44AA-404B-B012-C71C5751DEB9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DE6782F3-44AA-404B-B012-C71C5751DEB9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DE6782F3-44AA-404B-B012-C71C5751DEB9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2EB628A8-8310-4EA2-BC57-50F8EDD8949B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2EB628A8-8310-4EA2-BC57-50F8EDD8949B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2EB628A8-8310-4EA2-BC57-50F8EDD8949B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2EB628A8-8310-4EA2-BC57-50F8EDD8949B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {46C50A21-7F83-4B11-A9BF-585A3D422F98}
 	EndGlobalSection
 EndGlobal

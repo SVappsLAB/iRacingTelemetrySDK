@@ -17,7 +17,7 @@
 using System.Collections.Generic;
 
 #nullable disable
-namespace SVappsLAB.iRacingTelemetrySDK.Models
+namespace SVappsLAB.iRacingTelemetrySDK
 {
     public class SplitTimeInfo
     {

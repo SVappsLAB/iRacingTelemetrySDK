@@ -110,11 +110,12 @@ namespace SVappsLAB.iRacingTelemetrySDK.DataProviders
             return sessInfo;
         }
 
-        public object GetVarValue(string varName)
+        public object? GetVarValue(string varName)
         {
             if (!_varHeaders!.TryGetValue(varName, out irsdk_varHeader vh))
             {
-                throw new Exception($"the telemetry value '{varName}' does not exist");
+                _logger.LogDebug("Telemetry variable [{varName}] not found in data provider", varName);
+                return null;
             }
 
             var rosBuffer = _telemetryDataBuffer.AsSpan();

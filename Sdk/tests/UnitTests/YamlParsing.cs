@@ -17,8 +17,10 @@
 // disable for file
 #pragma warning disable CS8602
 
+using System;
+using System.IO;
+using System.Reflection;
 using SVappsLAB.iRacingTelemetrySDK;
-using SVappsLAB.iRacingTelemetrySDK.Models;
 using Xunit;
 
 namespace UnitTests

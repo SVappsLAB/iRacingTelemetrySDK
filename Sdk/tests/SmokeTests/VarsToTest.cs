@@ -14,23 +14,21 @@
  * limitations under the License.using Microsoft.CodeAnalysis;
 **/
 
-using System.Collections.Generic;
+using SVappsLAB.iRacingTelemetrySDK;
 
-#nullable disable
-namespace SVappsLAB.iRacingTelemetrySDK
+namespace SmokeTests
 {
-    public class TelemetrySessionInfo
+    // this class is only used as a convenient place to define a
+    // set of shared variables that the live and ibt test classes can use
+    [RequiredTelemetryVars([
+        TelemetryVar.dcPushToPass,      // type 1 - boolean
+        TelemetryVar.SessionNum,        // type 2 - int
+        TelemetryVar.EngineWarnings,    // type 3 - bitfield (flags)
+        TelemetryVar.RPM,               // type 4 - float
+        TelemetryVar.SessionTime,       // type 5 - double
+        TelemetryVar.CarDistAhead,      // new var, doesn't exist in old ibt files
+        ])]
+    public class VarsToTest
     {
-        public WeekendInfo WeekendInfo { get; set; }
-        public SessionInfo SessionInfo { get; set; }
-        public QualifyResultsInfo QualifyResultsInfo { get; set; }
-        public CameraInfo CameraInfo { get; set; }
-        public RadioInfo RadioInfo { get; set; }
-        public DriverInfo DriverInfo { get; set; }
-        public SplitTimeInfo SplitTimeInfo { get; set; }
-        public Dictionary<string, object> CarSetup { get; set; }
     }
-
 }
-#nullable enable
-

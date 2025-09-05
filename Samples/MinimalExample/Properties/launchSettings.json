@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "MinimalExample": {
+      "commandName": "Project",
+      "commandLineArgs": "\"..\\..\\..\\..\\data\\formulair04_tsukuba 2kfull 2024-01-09 17-26-10.ibt\""
+    }
+  }
+}

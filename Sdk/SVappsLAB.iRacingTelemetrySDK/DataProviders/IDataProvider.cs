@@ -58,11 +58,10 @@ namespace SVappsLAB.iRacingTelemetrySDK.DataProviders
         /// Gets the value of a telemetry variable by name.
         /// </summary>
         /// <param name="varName">The name of the variable to retrieve.</param>
-        /// <returns>The value of the variable, which could be a scalar or an array.</returns>
+        /// <returns>The value of the variable, which could be a scalar or an array. Returns null if the variable is not found.</returns>
         /// <exception cref="InvalidOperationException">Thrown when variable headers or telemetry buffer are not initialized.</exception>
-        /// <exception cref="KeyNotFoundException">Thrown when the specified variable name does not exist.</exception>
         /// <exception cref="IndexOutOfRangeException">Thrown when the variable's data would exceed buffer boundaries.</exception>
-        object GetVarValue(string varName);
+        object? GetVarValue(string varName);
 
         /// <summary>
         /// Waits for new telemetry data to become available.
