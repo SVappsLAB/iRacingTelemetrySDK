@@ -1,22 +1,35 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<TargetFramework>net8.0</TargetFramework>
 		<Nullable>enable</Nullable>
 		<LangVersion>Latest</LangVersion>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
 	</PropertyGroup>
 
 	<PropertyGroup>
-		<NoWarn>$(NoWarn);CA1416</NoWarn>
+		<NoWarn>$(NoWarn);CA1416;CS1591;CS1587</NoWarn>
 	</PropertyGroup>
+
+	<ItemGroup>
+		<AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+			<_Parameter1>UnitTests</_Parameter1>
+		</AssemblyAttribute>
+		<AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+			<_Parameter1>SmokeTests</_Parameter1>
+		</AssemblyAttribute>
+	</ItemGroup>
 
 	<ItemGroup>
 		<None Include="..\..\NUGET.md" Pack="true" PackagePath="" />
 		<None Include="..\..\LICENSE" Pack="true" PackagePath="" />
+		<Content Include="contents\docs\AI_USAGE.md" Pack="true" PackagePath="contentFiles\any\any\docs\SVappsLAB.iRacingTelemetrySDK/AI_USAGE.md" CopyToOutputDirectory="PreserveNewest" />
+		<None Include="build\SVappsLAB.iRacingTelemetrySDK.props" Pack="true" PackagePath="build\" />
 	</ItemGroup>
 	<ItemGroup>
-		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.7" />
+		<PackageReference Include="Microsoft.Extensions.Diagnostics.Abstractions" Version="10.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
 		<PackageReference Include="YamlDotNet" Version="16.3.0" />
 		<ProjectReference Include="..\SVappsLAB.iRacingTelemetrySDK.CodeGen\SVappsLAB.iRacingTelemetrySDK.CodeGen.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
 		<ProjectReference Include="..\SVappsLAB.iRacingTelemetrySDK.EnumsAndFlags\SVappsLAB.iRacingTelemetrySDK.EnumsAndFlags.csproj" PrivateAssets="all" />
@@ -35,7 +48,7 @@
 		<PackageTags>iRacing iRacingSDK irsdk IBT Telemetry SDK API</PackageTags>
 		<PackageReadmeFile>NUGET.md</PackageReadmeFile>
 		<PackageLicenseFile>LICENSE</PackageLicenseFile>
-		<Version>0.9.8.3</Version>
+		<Version>1.0.0</Version>
 		<Authors>Scott Velez</Authors>
 		<Company>SVappsLAB</Company>
 		<Copyright>Copyright (c) 2025 SVappsLAB</Copyright>

@@ -11,13 +11,13 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License.using Microsoft.CodeAnalysis;
+ * limitations under the License.
 **/
 
 using System.Collections.Generic;
 
 #nullable disable
-namespace SVappsLAB.iRacingTelemetrySDK.Models
+namespace SVappsLAB.iRacingTelemetrySDK
 {
     public class TelemetrySessionInfo
     {
@@ -28,9 +28,7 @@ namespace SVappsLAB.iRacingTelemetrySDK.Models
         public RadioInfo RadioInfo { get; set; }
         public DriverInfo DriverInfo { get; set; }
         public SplitTimeInfo SplitTimeInfo { get; set; }
-        //public dynamic CarSetup { get; set; }
         public Dictionary<string, object> CarSetup { get; set; }
-
     }
 
 }

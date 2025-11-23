@@ -11,13 +11,15 @@
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
- * limitations under the License.using Microsoft.CodeAnalysis;
+ * limitations under the License.
 **/
 
 using System;
 using System.IO;
 using System.IO.MemoryMappedFiles;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using SVappsLAB.iRacingTelemetrySDK.IBTPlayback;
 using SVappsLAB.iRacingTelemetrySDK.irSDKDefines;
@@ -68,11 +70,13 @@ namespace SVappsLAB.iRacingTelemetrySDK.DataProviders
         }
 
         // wait for iRacing to signal there is new data
-        public override bool WaitForDataReady(TimeSpan _timeSpan)
+        public override Task<bool> WaitForDataReady(TimeSpan _timeSpan, CancellationToken cancellationToken = default)
         {
-            // throttle playback speed
-            _governor.GovernSpeed(_currentRecord).Wait();
+            return IBTDataProviderAsyncHelper.WaitForDataReady(_governor, _currentRecord, this);
+        }
 
+        internal bool ProcessNextRecord()
+        {
             CopyNewTelemetryDataToBuffer(_currentRecord);
 
             _currentRecord++;
@@ -91,9 +95,22 @@ namespace SVappsLAB.iRacingTelemetrySDK.DataProviders
 
             return diskSubHeader;
         }
-        protected override void Dispose(bool disposing)
+        public override ValueTask DisposeAsync()
         {
-            base.Dispose(disposing);
+            // IBTDataProvider doesn't have additional resources to dispose
+            return base.DisposeAsync();
+        }
+    }
+
+    // Helper class to handle async operations outside unsafe context
+    internal static class IBTDataProviderAsyncHelper
+    {
+        public static async Task<bool> WaitForDataReady(IPlaybackGovernor governor, int currentRecord, IBTDataProvider provider)
+        {
+            // throttle playback speed
+            await governor.GovernSpeed(currentRecord).ConfigureAwait(false);
+
+            return provider.ProcessNextRecord();
         }
     }
 }
