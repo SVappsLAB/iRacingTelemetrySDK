@@ -14,10 +14,11 @@ Perfect for building **real-time dashboards**, **data analysis tools**, **race e
 - [Quick Example](#quick-example)
 - [Getting Started](#getting-started)
 - [Understanding Telemetry Variables](#understanding-telemetry-variables)
-- [Performance and Design](#performance-and-design)
-- [Performance Monitoring](#performance-monitoring)
 - [Samples](#samples)
 - [Documentation](#documentation)
+- [AI-Assisted Development](#ai-assisted-development)
+- [Performance and Design](#performance-and-design)
+- [Performance Monitoring](#performance-monitoring)
 - [License](#license)
 
 ## Features
@@ -69,11 +70,7 @@ public class Program
 
 ## Getting Started
 
-> ⚠️ **v1.0+ Breaking Changes**: This 1.0 version introduces significant API changes with enum-based variable identification and async data streaming. If upgrading from a previous version, see [MIGRATION_GUIDE.md](./MIGRATION_GUIDE.md) for detailed migration instructions.
-
 To incorporate **iRacingTelemetrySDK** into your projects, follow these steps:
-
-> 🤖 **For AI-assisted development**, see [AI_USAGE.md](./Sdk/SVappsLAB.iRacingTelemetrySDK/contents/docs/AI_USAGE.md) - a comprehensive guide with tips, best practices, and examples specifically designed for AI agents to help you build telemetry applications more effectively.
 
 1. **Install the Package:** Add the **iRacingTelemetrySDK** NuGet package to your project using your preferred package manager.
 
@@ -258,6 +255,33 @@ var hasValue = data.Speed.HasValue;
 if (data.IsOnTrackCar == true) { /* ... */ }
 ```
 
+## Samples
+
+See [Samples Directory](./Samples/README.md) for ready-to-run example projects including:
+- Basic telemetry monitoring
+- IBT file analysis
+- Data export utilities
+- Track analysis tools
+
+## Documentation
+
+- **[Migration Guide](./MIGRATION_GUIDE.md)** - Upgrading from early pre-1.0 releases
+- **[AI Agent Guide](./Sdk/SVappsLAB.iRacingTelemetrySDK/contents/.ai/AGENTS.md)** - Support for AI coding agents: SDK rules, patterns, and examples
+
+## AI-Assisted Development
+
+This package includes an **AI agent guide** that can be referenced in your project.
+
+```
+.ai/SVappsLAB.iRacingTelemetrySDK/AGENTS.md
+```
+
+Point your AI coding agent to this file for SDK-specific patterns, complete examples, and common pitfalls. For example, reference this file in your prompt, or add this to your project's `AGENTS.md`, `CLAUDE.md`, `.cursorrules`, so it's always available:
+
+```
+When working with iRacing telemetry, read the .ai/SVappsLAB.iRacingTelemetrySDK/AGENTS.md reference for SDK usage rules and examples.
+```
+
 ## Performance and Design
 
 The SDK is designed for high performance with zero data loss through async data streaming architecture.
@@ -391,19 +415,6 @@ dotnet-counters monitor --name "YourApp" --counters SVappsLAB.iRacingTelemetrySD
 ```
 
 This helps identify performance bottlenecks, monitor processing rates, and detect if records are being dropped due to slow consumption.
-
-## Samples
-
-See [Samples Directory](./Samples/README.md) for ready-to-run example projects including:
-- Basic telemetry monitoring
-- IBT file analysis
-- Data export utilities
-- Track analysis tools
-
-## Documentation
-
-- **[Migration Guide](./MIGRATION_GUIDE.md)** - Upgrading from previous (pre-release) versions
-- **[AI Assistant Instructions](./Sdk/SVappsLAB.iRacingTelemetrySDK/contents/docs/AI_USAGE.md)** - Documentation for AI Assistants
 
 ## License
 

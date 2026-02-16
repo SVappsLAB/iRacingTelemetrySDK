@@ -32,6 +32,21 @@ Perfect for building:
 - **Telemetry Visualizations** - Create charts and graphs from historical data
 
 
+## Support for AI-Assisted Development
+
+This package includes an **AI agent guide** that can be referenced in your project.
+
+```
+.ai/SVappsLAB.iRacingTelemetrySDK/AGENTS.md
+```
+
+Point your AI coding agent to this file for SDK-specific patterns, complete examples, and common pitfalls. For example, reference this file in your prompt, or add this to your project's `AGENTS.md`, `CLAUDE.md`, `.cursorrules`, so it's always available:
+
+```
+When working with iRacing telemetry, read the .ai/SVappsLAB.iRacingTelemetrySDK/AGENTS.md reference for SDK usage rules and examples.
+```
+
+
 ## Installation
 
 ```bash
