@@ -1,45 +1,46 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
-	<PropertyGroup>
-		<TargetFramework>net8.0</TargetFramework>
-		<Nullable>enable</Nullable>
-		<LangVersion>Latest</LangVersion>
-		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-		<GenerateDocumentationFile>true</GenerateDocumentationFile>
-	</PropertyGroup>
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <LangVersion>Latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
 
-	<PropertyGroup>
-		<NoWarn>$(NoWarn);CA1416;CS1591;CS1587</NoWarn>
-	</PropertyGroup>
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);CA1416;CS1591;CS1587</NoWarn>
+  </PropertyGroup>
 
-	<ItemGroup>
-		<AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
-			<_Parameter1>UnitTests</_Parameter1>
-		</AssemblyAttribute>
-		<AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
-			<_Parameter1>SmokeTests</_Parameter1>
-		</AssemblyAttribute>
-	</ItemGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>UnitTests</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>SmokeTests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
 
-	<ItemGroup>
-		<None Include="..\..\NUGET.md" Pack="true" PackagePath="" />
-		<None Include="..\..\LICENSE" Pack="true" PackagePath="" />
-		<Content Include="contents\docs\AI_USAGE.md" Pack="true" PackagePath="contentFiles\any\any\docs\SVappsLAB.iRacingTelemetrySDK/AI_USAGE.md" CopyToOutputDirectory="PreserveNewest" />
-		<None Include="build\SVappsLAB.iRacingTelemetrySDK.props" Pack="true" PackagePath="build\" />
-	</ItemGroup>
-	<ItemGroup>
-		<PackageReference Include="Microsoft.Extensions.Diagnostics.Abstractions" Version="10.0.3" />
-		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.3" />
-		<PackageReference Include="YamlDotNet" Version="16.3.0" />
-		<ProjectReference Include="..\SVappsLAB.iRacingTelemetrySDK.CodeGen\SVappsLAB.iRacingTelemetrySDK.CodeGen.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
-		<ProjectReference Include="..\SVappsLAB.iRacingTelemetrySDK.EnumsAndFlags\SVappsLAB.iRacingTelemetrySDK.EnumsAndFlags.csproj" PrivateAssets="all" />
+  <ItemGroup>
+    <None Include="..\..\NUGET.md" Pack="true" PackagePath="" />
+    <None Include="..\..\LICENSE" Pack="true" PackagePath="" />
+    <Content Include="contents\.ai\AGENTS.md" Pack="true" PackagePath="contentFiles\any\any\.ai\SVappsLAB.iRacingTelemetrySDK/AGENTS.md" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="build\SVappsLAB.iRacingTelemetrySDK.props" Pack="true" PackagePath="build\" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.Abstractions" Version="10.0.3" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.3" />
+    <PackageReference Include="YamlDotNet" Version="16.3.0" />
+    <ProjectReference Include="..\SVappsLAB.iRacingTelemetrySDK.CodeGen\SVappsLAB.iRacingTelemetrySDK.CodeGen.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\SVappsLAB.iRacingTelemetrySDK.EnumsAndFlags\SVappsLAB.iRacingTelemetrySDK.EnumsAndFlags.csproj" PrivateAssets="all" />
 
-	    <!-- nuget package - analyzers/dotnet/cs -->
-        <None Include="..\SVappsLAB.iRacingTelemetrySDK.CodeGen\bin\$(Configuration)\netstandard2.0\SVappsLAB.iRacingTelemetrySDK.CodeGen.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
-        <None Include="bin\$(Configuration)\net8.0\SVappsLAB.iRacingTelemetrySDK.EnumsAndFlags.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" PrivateAssets="all" />
-	    <!-- nuget package - include enum types with SDK -->
-        <None Include="bin\$(Configuration)\net8.0\SVappsLAB.iRacingTelemetrySDK.EnumsAndFlags.dll" Pack="true" PackagePath="lib/net8.0" Visible="false" PrivateAssets="all" />
-	</ItemGroup>
+    <!-- nuget package - analyzers/dotnet/cs -->
+    <None Include="..\SVappsLAB.iRacingTelemetrySDK.CodeGen\bin\$(Configuration)\netstandard2.0\SVappsLAB.iRacingTelemetrySDK.CodeGen.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    <None Include="bin\$(Configuration)\net8.0\SVappsLAB.iRacingTelemetrySDK.EnumsAndFlags.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" PrivateAssets="all" />
+    <!-- nuget package - include enum types with SDK -->
+    <None Include="bin\$(Configuration)\net8.0\SVappsLAB.iRacingTelemetrySDK.EnumsAndFlags.dll" Pack="true" PackagePath="lib/net8.0" Visible="false" PrivateAssets="all" />
+  </ItemGroup>
 
 	<PropertyGroup>
 		<PackageId>SVappsLAB.iRacingTelemetrySDK</PackageId>
