@@ -97,7 +97,14 @@ namespace SpeedRPMGear
             cts.Cancel();
 
             // await for all tasks to complete
-            await Task.WhenAll(monitorTask, keyboardTask, telemetryTask);
+            try
+            {
+                await Task.WhenAll(monitorTask, keyboardTask, telemetryTask);
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected when cancellation is requested
+            }
 
 
             // telemetry data handler
