@@ -1,12 +1,12 @@
 /**
  * Copyright (C)2024 Scott Velez
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -25,7 +25,7 @@ namespace DumpVariables_DumpSessionInfo
 
         static async Task Main(string[] args)
         {
-            string timeStamp = DateTime.Now.ToString("yyyyMMdd-HHMMss");
+            string timeStamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
             string VARIABLES_FILENAME = $"iRacingVariables-{timeStamp}.csv";
             string SESSIONINFO_FILENAME = $"IRacingSessionInfo-{timeStamp}.yaml";
             // amount of time to wait for data
@@ -99,10 +99,10 @@ namespace DumpVariables_DumpSessionInfo
             }
 
             // wait for 2 seconds to exit
-            bool success = await Task.WhenAny(monitorTask, rawSessionTask) == monitorTask ?
-                monitorTask.Wait(2 * 1000) :
-                rawSessionTask.Wait(2 * 1000);
-            logger.LogInformation("Done. Status: {status}", success ? "successful" : "timeout");
+            var success = await Task.WhenAny(
+                Task.WhenAll(monitorTask, rawSessionTask),
+                Task.Delay(2000));
+            logger.LogInformation("Done. Status: {status}", success.IsCompleted ? "successful" : "timeout");
 
 
 
