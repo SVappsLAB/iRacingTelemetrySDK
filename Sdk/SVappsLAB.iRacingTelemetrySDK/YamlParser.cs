@@ -33,10 +33,9 @@ namespace SVappsLAB.iRacingTelemetrySDK
         public YamlParser()
         {
             _yamlDeserializer = new DeserializerBuilder()
-#if !DEBUG
+#if RELEASE
                 .IgnoreUnmatchedProperties()
 #endif
-                //.WithNamingConvention(UnderscoredNamingConvention.Instance)
                 .Build();
         }
 
