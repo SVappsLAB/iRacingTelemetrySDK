@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2024-2025 Scott Velez
+ * Copyright (C) 2024-2026 Scott Velez
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,6 +39,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
         public int SessionSkipped { get; set; } // 0
         public int SessionRunGroupsUsed { get; set; } // 0
         public int SessionEnforceTireCompoundChange { get; set; } // 0
+        public List<QualifyPosition> QualifyPositions { get; set; }
         public List<ResultPosition> ResultsPositions { get; set; }
         public List<ResultFastestLap> ResultsFastestLap { get; set; }
         public float ResultsAverageLapTime { get; set; } // -1.0000
@@ -48,7 +49,14 @@ namespace SVappsLAB.iRacingTelemetrySDK
         public int ResultsLapsComplete { get; set; } // -1
         public int ResultsOfficial { get; set; } // 0
 
-
+        public class QualifyPosition
+        {
+            public int Position { get; set; }
+            public int ClassPosition { get; set; }
+            public int CarIdx { get; set; }
+            public int FastestLap { get; set; }
+            public float FastestTime { get; set; }
+        }
 
         public class ResultPosition
         {
@@ -67,16 +75,12 @@ namespace SVappsLAB.iRacingTelemetrySDK
             public int Incidents { get; set; } // 0
             public int ReasonOutId { get; set; } // 0
             public string ReasonOutStr { get; set; } // ""
-
         }
-
         public class ResultFastestLap
-
         {
             public int CarIdx { get; set; } // 255
             public int FastestLap { get; set; } // 0
             public float FastestTime { get; set; } // -1.0000
-
         }
 
     }

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2024-2025 Scott Velez
+ * Copyright (C) 2024-2026 Scott Velez
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,9 +19,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.IO;
-using System.Linq;
-using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -29,6 +28,7 @@ using Microsoft.Extensions.Logging;
 using SVappsLAB.iRacingTelemetrySDK.DataProviders;
 using SVappsLAB.iRacingTelemetrySDK.irSDKDefines;
 using SVappsLAB.iRacingTelemetrySDK.Metrics;
+using SVappsLAB.iRacingTelemetrySDK.YamlParsing;
 
 namespace SVappsLAB.iRacingTelemetrySDK
 {
@@ -257,7 +257,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
             _metricsService = new MetricsService(clientOptions?.MeterFactory, _ibtOptions == null ? "Live" : "IBT");
 
             _telemetryAccessor = new TelemetryDataAccessor<T>(_logger);
-            _sessionInfoParser = new YamlParser();
+            _sessionInfoParser = new YamlParser(_logger);
         }
 
         /// <summary>
@@ -536,7 +536,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
                 {
                     // tasks should exit quickly now that token is cancelled
                     // timeout is a safety net for unexpected hangs
-	                var shutdownTimeoutToken = new CancellationTokenSource(TimeSpan.FromSeconds(10)).Token;
+                    var shutdownTimeoutToken = new CancellationTokenSource(TimeSpan.FromSeconds(10)).Token;
                     await Task.WhenAll(tasksToWait).WaitAsync(shutdownTimeoutToken).ConfigureAwait(false);
                 }
             }

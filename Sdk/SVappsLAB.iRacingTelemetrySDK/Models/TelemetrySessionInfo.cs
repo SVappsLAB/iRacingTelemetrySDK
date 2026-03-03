@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2024-2025 Scott Velez
+ * Copyright (C) 2024-2026 Scott Velez
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
 **/
 
 using System.Collections.Generic;
+using YamlDotNet.Serialization;
 
 #nullable disable
 namespace SVappsLAB.iRacingTelemetrySDK
@@ -29,8 +30,12 @@ namespace SVappsLAB.iRacingTelemetrySDK
         public DriverInfo DriverInfo { get; set; }
         public SplitTimeInfo SplitTimeInfo { get; set; }
         public Dictionary<string, object> CarSetup { get; set; }
-    }
 
+        // some IBT files have these older properties
+        public int SessionStartTime { get; set; }
+        [YamlMember(Alias = "VRS-TelemetryLogger")]
+        public object VRS_TelemetryLogger { get; set; }
+    }
 }
 #nullable enable
 

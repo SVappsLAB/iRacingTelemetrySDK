@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2024-2025 Scott Velez
+ * Copyright (C) 2024-2026 Scott Velez
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -112,11 +112,11 @@ namespace SVappsLAB.iRacingTelemetrySDK
         public int HasOpenRegistration { get; set; } // 0
         public int HardcoreLevel { get; set; } // 1
         public int NumJokerLaps { get; set; } // 0
-        public string IncidentLimit { get; set; } // unlimited
-        public string IncidentWarningInitialLimit { get; set; } // unlimited
-        public object IncidentWarningSubsequentLimit { get; set; } // unlimited
-        public string FastRepairsLimit { get; set; } // unlimited
-        public int GreenWhiteCheckeredLimit { get; set; } // 0
+        public string IncidentLimit { get; set; } // 'unlimited' or '0'..'n'
+        public string IncidentWarningInitialLimit { get; set; } // 'unlimited' or '0'..'n
+        public object IncidentWarningSubsequentLimit { get; set; } // 'unlimited' or '0'..'n'
+        public string FastRepairsLimit { get; set; } // 'unlimited' or '0'..'n'
+        public string GreenWhiteCheckeredLimit { get; set; } //'unlimited' or '0'..'n' 
 
     }
 
