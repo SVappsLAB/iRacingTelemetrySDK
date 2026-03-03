@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using SVappsLAB.iRacingTelemetrySDK;
 using SVappsLAB.iRacingTelemetrySDK.DataProviders;
+using SVappsLAB.iRacingTelemetrySDK.YamlParsing;
 
 namespace SmokeTests;
 
@@ -25,7 +26,7 @@ public class IBTYamlValidation
         var ibtFiles = Directory.GetFiles(TelemetryDir, "*.ibt");
         Assert.True(ibtFiles.Length > 0, "no IBT files found");
 
-        var parser = new YamlParser();
+        var parser = new YamlParser(new XunitLogger(_output));
         var failures = new List<(string file, string error)>();
         var successes = new List<(string file, int attempts)>();
 
