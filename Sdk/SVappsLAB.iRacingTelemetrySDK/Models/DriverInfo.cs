@@ -33,6 +33,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
         public int DriverCarEngCylinderCount { get; set; } // 4
         public float DriverCarFuelKgPerLtr { get; set; } // 0.750
         public float DriverCarFuelMaxLtr { get; set; } // 44.987
+        public float DriverCarFuelMaxKWh { get; set; } // max battery capacity in kWh
         public float DriverCarMaxFuelPct { get; set; } // in percentage
         public int DriverCarGearNumForward { get; set; } // 6
         public int DriverCarGearNeutral { get; set; } // 1
