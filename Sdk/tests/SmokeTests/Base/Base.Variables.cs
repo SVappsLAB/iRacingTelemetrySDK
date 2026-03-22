@@ -14,7 +14,6 @@
  * limitations under the License.
 **/
 
-using System.Diagnostics;
 using SVappsLAB.iRacingTelemetrySDK;
 
 namespace SmokeTests;
@@ -26,7 +25,7 @@ public abstract partial class Base<T> where T : class
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSecs));
 
         bool variablesReceived = false;
-        List<string>? allMissingVariables = null;
+        List<TelemetryVariable>? allMissingVariables = null;
 
         // start telemetry data consumption
         var telemetryTask = Task.Run(async () =>
@@ -44,10 +43,10 @@ public abstract partial class Base<T> where T : class
                     .Select(e => e.ToString())
                     .ToHashSet();
 
-                // find variables that exist in iRacing but not in our enum
-                allMissingVariables = availableVariableNames
-                    .Where(varName => !enumVariables.Contains(varName))
-                    .OrderBy(varName => varName)
+                // find variables that exist in iRacing but not in our enum (keep full variable info)
+                allMissingVariables = availableVariables
+                    .Where(v => !enumVariables.Contains(v.Name))
+                    .OrderBy(v => v.Name)
                     .ToList();
 
                 cts.Cancel();
@@ -65,7 +64,9 @@ public abstract partial class Base<T> where T : class
 
         if (allMissingVariables != null && allMissingVariables.Count > 0)
         {
-            Assert.Fail($"Found {allMissingVariables.Count} variables in iRacing telemetry that are missing from TelemetryVar enum: {string.Join(", ", allMissingVariables)}");
+            var formatted = allMissingVariables.Select(v =>
+                $"Name={v.Name}, Type={v.Type?.Name ?? "null"}, Length={v.Length}, IsTimeValue={v.IsTimeValue}, Desc=\"{v.Desc}\", Units=\"{v.Units}\"");
+            Assert.Fail($"Found {allMissingVariables.Count} variables in iRacing telemetry that are missing from TelemetryVar enum and iRacingVars dictionary:\n{string.Join("\n", formatted)}");
         }
     }
 }
