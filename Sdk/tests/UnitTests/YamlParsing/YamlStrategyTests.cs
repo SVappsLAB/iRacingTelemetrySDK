@@ -50,6 +50,7 @@ namespace UnitTests.YamlParsing
         [InlineData("  Initials: [", "Initials: '['")]
         [InlineData("  TeamName: @ALL", "TeamName: '@ALL'")]
         [InlineData("  UserName: O'Neil", "UserName: 'O''Neil'")]
+        [InlineData("     CameraName: TV1 (Director)", "CameraName: 'TV1 (Director)'")]
         public void QuoteValues_QuotesProblematicValues(string inputLine, string expectedOutput)
         {
             var result = _quoteStrategy.Prepare(inputLine);
