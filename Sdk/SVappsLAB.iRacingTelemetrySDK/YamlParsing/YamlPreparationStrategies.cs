@@ -63,7 +63,7 @@ namespace SVappsLAB.iRacingTelemetrySDK.YamlParsing
             });
         }
 
-        [GeneratedRegex(@"^(\s*(?:AbbrevName|TeamName|UserName|Initials|DriverSetupName):)([ \t]+\S.*)$", RegexOptions.Multiline)]
+        [GeneratedRegex(@"^(\s*(?:AbbrevName|TeamName|UserName|Initials|DriverSetupName|CameraName):)([ \t]+\S.*)$", RegexOptions.Multiline)]
         private static partial Regex KnownStringKeysRegex();
     }
 }
