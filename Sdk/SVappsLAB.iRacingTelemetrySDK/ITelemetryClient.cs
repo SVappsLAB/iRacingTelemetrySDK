@@ -17,7 +17,6 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
-using System.Threading.Channels;
 using System.Threading.Tasks;
 
 namespace SVappsLAB.iRacingTelemetrySDK
@@ -33,19 +32,20 @@ namespace SVappsLAB.iRacingTelemetrySDK
         /// </summary>
         /// <remarks>
         /// <para>
-        /// <strong>Cancellation:</strong> Use <c>.WithCancellation(cancellationToken)</c> to enable
-        /// cooperative cancellation when consuming this stream.
+        /// <strong>Lifetime:</strong> This stream completes when <see cref="Monitor(CancellationToken)"/> completes.
+        /// Use <c>.WithCancellation(cancellationToken)</c> only when this specific consumer should stop
+        /// before monitoring stops.
         /// </para>
         /// <para>
         /// <strong>Single Reader Limitation:</strong> This async stream is optimized for single concurrent reader.
         /// Attempting multiple concurrent enumerations (e.g., multiple <c>await foreach</c> loops) is not supported
-        /// and may cause undefined behavior. For multiple subscribers, use the <c>SubscribeToAllStreams</c> extension
-        /// method or create separate subscriptions.
+        /// and may cause undefined behavior. For callback-based consumption, use the
+        /// <see cref="Monitor(TelemetryHandlers{T}, CancellationToken)"/> overload.
         /// </para>
         /// </remarks>
         /// <example>
         /// <code>
-        /// await foreach (var state in client.ConnectStates.WithCancellation(ct))
+        /// await foreach (var state in client.ConnectStates)
         /// {
         ///     // Handle connection state change (Connected/Disconnected)
         /// }
@@ -58,19 +58,20 @@ namespace SVappsLAB.iRacingTelemetrySDK
         /// </summary>
         /// <remarks>
         /// <para>
-        /// <strong>Cancellation:</strong> Use <c>.WithCancellation(cancellationToken)</c> to enable
-        /// cooperative cancellation when consuming this stream.
+        /// <strong>Lifetime:</strong> This stream completes when <see cref="Monitor(CancellationToken)"/> completes.
+        /// Use <c>.WithCancellation(cancellationToken)</c> only when this specific consumer should stop
+        /// before monitoring stops.
         /// </para>
         /// <para>
         /// <strong>Single Reader Limitation:</strong> This async stream is optimized for single concurrent reader.
         /// Attempting multiple concurrent enumerations (e.g., multiple <c>await foreach</c> loops) is not supported
-        /// and may cause undefined behavior. For multiple subscribers, use the <c>SubscribeToAllStreams</c> extension
-        /// method or create separate subscriptions.
+        /// and may cause undefined behavior. For callback-based consumption, use the
+        /// <see cref="Monitor(TelemetryHandlers{T}, CancellationToken)"/> overload.
         /// </para>
         /// </remarks>
         /// <example>
         /// <code>
-        /// await foreach (var error in client.Errors.WithCancellation(ct))
+        /// await foreach (var error in client.Errors)
         /// {
         ///     // Handle error exception
         /// }
@@ -83,19 +84,20 @@ namespace SVappsLAB.iRacingTelemetrySDK
         /// </summary>
         /// <remarks>
         /// <para>
-        /// <strong>Cancellation:</strong> Use <c>.WithCancellation(cancellationToken)</c> to enable
-        /// cooperative cancellation when consuming this stream.
+        /// <strong>Lifetime:</strong> This stream completes when <see cref="Monitor(CancellationToken)"/> completes.
+        /// Use <c>.WithCancellation(cancellationToken)</c> only when this specific consumer should stop
+        /// before monitoring stops.
         /// </para>
         /// <para>
         /// <strong>Single Reader Limitation:</strong> This async stream is optimized for single concurrent reader.
         /// Attempting multiple concurrent enumerations (e.g., multiple <c>await foreach</c> loops) is not supported
-        /// and may cause undefined behavior. For multiple subscribers, use the <c>SubscribeToAllStreams</c> extension
-        /// method or create separate subscriptions.
+        /// and may cause undefined behavior. For callback-based consumption, use the
+        /// <see cref="Monitor(TelemetryHandlers{T}, CancellationToken)"/> overload.
         /// </para>
         /// </remarks>
         /// <example>
         /// <code>
-        /// await foreach (var rawYaml in client.SessionDataYaml.WithCancellation(ct))
+        /// await foreach (var rawYaml in client.SessionDataYaml)
         /// {
         ///     // Process raw YAML session data
         /// }
@@ -108,8 +110,9 @@ namespace SVappsLAB.iRacingTelemetrySDK
         /// </summary>
         /// <remarks>
         /// <para>
-        /// <strong>Cancellation:</strong> Use <c>.WithCancellation(cancellationToken)</c> to enable
-        /// cooperative cancellation when consuming this stream.
+        /// <strong>Lifetime:</strong> This stream completes when <see cref="Monitor(CancellationToken)"/> completes.
+        /// Use <c>.WithCancellation(cancellationToken)</c> only when this specific consumer should stop
+        /// before monitoring stops.
         /// </para>
         /// <para>
         /// <strong>Channel Behavior:</strong> Uses a 60-sample ring buffer with FIFO (First-In-First-Out)
@@ -120,13 +123,13 @@ namespace SVappsLAB.iRacingTelemetrySDK
         /// <para>
         /// <strong>Single Reader Limitation:</strong> This async stream is optimized for single concurrent reader.
         /// Attempting multiple concurrent enumerations (e.g., multiple <c>await foreach</c> loops) is not supported
-        /// and may cause undefined behavior. For multiple subscribers, use the <c>SubscribeToAllStreams</c> extension
-        /// method or create separate subscriptions.
+        /// and may cause undefined behavior. For callback-based consumption, use the
+        /// <see cref="Monitor(TelemetryHandlers{T}, CancellationToken)"/> overload.
         /// </para>
         /// </remarks>
         /// <example>
         /// <code>
-        /// await foreach (var sessionInfo in client.SessionData.WithCancellation(ct))
+        /// await foreach (var sessionInfo in client.SessionData)
         /// {
         ///     // Process parsed session information
         /// }
@@ -139,8 +142,9 @@ namespace SVappsLAB.iRacingTelemetrySDK
         /// </summary>
         /// <remarks>
         /// <para>
-        /// <strong>Cancellation:</strong> Use <c>.WithCancellation(cancellationToken)</c> to enable
-        /// cooperative cancellation when consuming this stream.
+        /// <strong>Lifetime:</strong> This stream completes when <see cref="Monitor(CancellationToken)"/> completes.
+        /// Use <c>.WithCancellation(cancellationToken)</c> only when this specific consumer should stop
+        /// before monitoring stops.
         /// </para>
         /// <para>
         /// <strong>Channel Behavior:</strong> Uses a 60-sample ring buffer with FIFO (First-In-First-Out)
@@ -153,13 +157,13 @@ namespace SVappsLAB.iRacingTelemetrySDK
         /// <para>
         /// <strong>Single Reader Limitation:</strong> This async stream is optimized for single concurrent reader.
         /// Attempting multiple concurrent enumerations (e.g., multiple <c>await foreach</c> loops) is not supported
-        /// and may cause undefined behavior. For multiple subscribers, use the <c>SubscribeToAllStreams</c> extension
-        /// method or create separate subscriptions.
+        /// and may cause undefined behavior. For callback-based consumption, use the
+        /// <see cref="Monitor(TelemetryHandlers{T}, CancellationToken)"/> overload.
         /// </para>
         /// </remarks>
         /// <example>
         /// <code>
-        /// await foreach (var telemetry in client.TelemetryData.WithCancellation(ct))
+        /// await foreach (var telemetry in client.TelemetryData)
         /// {
         ///     // Process telemetry data (Speed, RPM, etc.)
         /// }
@@ -207,6 +211,32 @@ namespace SVappsLAB.iRacingTelemetrySDK
         Task<int> Monitor(CancellationToken ct);
 
         /// <summary>
+        /// Monitors telemetry data and invokes callback handlers for selected streams.
+        /// </summary>
+        /// <param name="handlers">The callback handlers to invoke while monitoring.</param>
+        /// <param name="ct">The cancellation token to stop the monitoring operation.</param>
+        /// <returns>
+        /// A task that represents the asynchronous monitoring operation.
+        /// The result is the number of telemetry data records processed during the monitoring session.
+        /// </returns>
+        /// <remarks>
+        /// <para>
+        /// This overload is the simplest way to consume telemetry. It starts stream consumption,
+        /// starts monitoring, and returns when monitoring ends. Cancelling <paramref name="ct"/>
+        /// stops monitoring and returns normally after handlers finish.
+        /// </para>
+        /// <para>
+        /// Handler exceptions fault this method directly. SDK processing errors are delivered to
+        /// <see cref="TelemetryHandlers{T}.OnError"/> when that handler is provided.
+        /// </para>
+        /// <para>
+        /// Handlers are awaited sequentially per stream. Keep handlers fast, especially telemetry
+        /// handlers that may run at 60Hz.
+        /// </para>
+        /// </remarks>
+        Task<int> Monitor(TelemetryHandlers<T> handlers, CancellationToken ct);
+
+        /// <summary>
         /// Gets a value indicating whether the client is connected to the telemetry source.
         /// </summary>
         /// <value>
@@ -234,4 +264,3 @@ namespace SVappsLAB.iRacingTelemetrySDK
         bool IsPaused { get; }
     }
 }
-

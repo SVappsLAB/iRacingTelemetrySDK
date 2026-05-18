@@ -27,10 +27,9 @@ public abstract partial class Base<T> where T : class
         bool variablesReceived = false;
         List<TelemetryVariable>? allMissingVariables = null;
 
-        // start telemetry data consumption
         var telemetryTask = Task.Run(async () =>
         {
-            await foreach (var telemetryData in client.TelemetryData.WithCancellation(cts.Token))
+            await foreach (var telemetryData in client.TelemetryData)
             {
                 variablesReceived = true;
 
@@ -52,13 +51,12 @@ public abstract partial class Base<T> where T : class
                 cts.Cancel();
                 break; // exit after first item
             }
-        }, cts.Token);
+        });
 
         // start monitoring
         var monitorTask = client.Monitor(cts.Token);
 
-        // wait for either task to complete
-        await Task.WhenAny(telemetryTask, monitorTask);
+        await Task.WhenAll(telemetryTask, monitorTask);
 
         Assert.True(variablesReceived, "Telemetry data was not received within the timeout period.");
 

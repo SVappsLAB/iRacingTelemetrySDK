@@ -14,6 +14,7 @@
  * limitations under the License.
 **/
 
+using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using SVappsLAB.iRacingTelemetrySDK;
@@ -22,6 +23,7 @@ using SVappsLAB.iRacingTelemetrySDK;
 namespace SmokeTests;
 
 
+[Trait("Category", "ibt")]
 public class IBT : Base<IBT>
 {
     const int TIMEOUT_SECS = 5;
@@ -81,6 +83,8 @@ public class IBT : Base<IBT>
     [MemberData(nameof(TestModes))]
     public async Task VerifyModelMatchesRawYaml(string mode, Func<ILogger, ITelemetryClient<TelemetryData>> clientFactory)
     {
+        Assert.NotEmpty(mode);
+
         await using var client = clientFactory(_logger);
         await BaseVerifyModelMatchesRawYaml(client, TIMEOUT_SECS);
     }
@@ -89,8 +93,141 @@ public class IBT : Base<IBT>
     [MemberData(nameof(TestModes))]
     public async Task VerifyAllVariablesAreCovered(string mode, Func<ILogger, ITelemetryClient<TelemetryData>> clientFactory)
     {
+        Assert.NotEmpty(mode);
+
         await using var client = clientFactory(_logger);
         await BaseVerifyAllVariablesCovered(client, TIMEOUT_SECS);
+    }
+
+    [Theory]
+    [MemberData(nameof(TestModes))]
+    public async Task MonitorCancellationCompletesDirectStreams(string mode, Func<ILogger, ITelemetryClient<TelemetryData>> clientFactory)
+    {
+        Assert.NotEmpty(mode);
+
+        await using var client = clientFactory(_logger);
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(TIMEOUT_SECS));
+
+        var telemetryReceived = false;
+        var telemetryTask = Task.Run(async () =>
+        {
+            await foreach (var telemetryData in client.TelemetryData)
+            {
+                telemetryReceived = true;
+                cts.Cancel();
+                break;
+            }
+        }, TestContext.Current.CancellationToken);
+
+        await client.Monitor(cts.Token);
+        await telemetryTask.WaitAsync(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
+
+        Assert.True(telemetryReceived);
+    }
+
+    [Theory]
+    [MemberData(nameof(TestModes))]
+    public async Task HandlerExceptionFaultsMonitor(string mode, Func<ILogger, ITelemetryClient<TelemetryData>> clientFactory)
+    {
+        Assert.NotEmpty(mode);
+
+        await using var client = clientFactory(_logger);
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(TIMEOUT_SECS));
+
+        var actual = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            client.Monitor(
+                new TelemetryHandlers<TelemetryData>
+                {
+                    OnTelemetryUpdate = _ => throw new InvalidOperationException("handler failed")
+                },
+                cts.Token));
+
+        Assert.Equal("handler failed", actual.Message);
+    }
+
+    [Fact]
+    public async Task MultipleHandlers_OneThrows_FaultsMonitorPromptly()
+    {
+        // regression test: with multiple handlers registered, a throwing handler must fault Monitor promptly.
+        var ibtFile = Directory.GetFiles(@"data\ibt", "raygr22*").First();
+
+        await using var client = TelemetryClient<TelemetryData>.Create(
+            _logger,
+            new IBTOptions(ibtFile, playBackSpeedMultiplier: 1));
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+
+        var sw = Stopwatch.StartNew();
+
+        var actual = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            client.Monitor(
+                new TelemetryHandlers<TelemetryData>
+                {
+                    OnTelemetryUpdate = _ => throw new InvalidOperationException("handler failed"),
+                    OnSessionInfoUpdate = _ => Task.CompletedTask,
+                    OnConnectStateChanged = _ => Task.CompletedTask
+                },
+                cts.Token));
+
+        sw.Stop();
+
+        Assert.Equal("handler failed", actual.Message);
+        Assert.True(sw.Elapsed < TimeSpan.FromSeconds(5),
+            $"Monitor should fault promptly when a handler throws, but took {sw.Elapsed.TotalSeconds:F1}s");
+    }
+
+    [Fact]
+    public async Task HungHandlerFaultsMonitorAfterShutdownTimeout()
+    {
+        var ibtFile = Directory.GetFiles(@"data\ibt", "*.ibt").First();
+
+        await using var client = TelemetryClient<TelemetryData>.Create(
+            _logger,
+            new IBTOptions(ibtFile));
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(TIMEOUT_SECS));
+
+        var exception = await Assert.ThrowsAsync<TimeoutException>(() =>
+            client.Monitor(
+                new TelemetryHandlers<TelemetryData>
+                {
+                    OnTelemetryUpdate = async _ =>
+                    {
+                        cts.Cancel();
+                        await Task.Delay(Timeout.InfiniteTimeSpan);
+                    }
+                },
+                cts.Token));
+
+        Assert.Contains("Telemetry handler did not complete within 5 seconds", exception.Message);
+    }
+
+    [Fact]
+    public async Task HandlerMonitorRejectsCompletedClientBeforeStartingHandlers()
+    {
+        var ibtFile = Directory.GetFiles(@"data\ibt", "*.ibt").First();
+
+        await using var client = TelemetryClient<TelemetryData>.Create(
+            _logger,
+            new IBTOptions(ibtFile));
+
+        await client.Monitor(CancellationToken.None);
+
+        var handlerCalled = false;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            client.Monitor(
+                new TelemetryHandlers<TelemetryData>
+                {
+                    OnTelemetryUpdate = _ =>
+                    {
+                        handlerCalled = true;
+                        return Task.CompletedTask;
+                    }
+                },
+                CancellationToken.None));
+
+        Assert.False(handlerCalled);
     }
 
     public static TheoryData<string, int> IBTPlaybackSpeeds =>

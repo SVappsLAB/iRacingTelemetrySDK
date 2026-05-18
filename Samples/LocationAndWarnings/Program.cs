@@ -51,20 +51,19 @@ namespace LocationAndWarnings
             // use cancellation token for proper shutdown
             using var cts = new CancellationTokenSource();
 
-            // start telemetry consumption
-            var telemetryTask = Task.Run(async () =>
-            {
-                await foreach (var data in tc.TelemetryData.WithCancellation(cts.Token))
-                {
-                    OnTelemetryUpdate(data);
-                }
-            }, cts.Token);
+            Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
 
             // start monitoring telemetry - press ctrl-c to exit
-            var monitorTask = tc.Monitor(cts.Token);
+            var handlers = new TelemetryHandlers<TelemetryData>
+            {
+                OnTelemetryUpdate = data =>
+                {
+                    OnTelemetryUpdate(data);
+                    return Task.CompletedTask;
+                }
+            };
 
-            // wait for either task to complete
-            await Task.WhenAny(monitorTask, telemetryTask);
+            await tc.Monitor(handlers, cts.Token);
             logger.LogInformation("done");
 
 
@@ -106,4 +105,3 @@ namespace LocationAndWarnings
         }
     }
 }
-

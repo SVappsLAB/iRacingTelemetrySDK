@@ -28,12 +28,11 @@ namespace DumpVariables_DumpSessionInfo
             string timeStamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
             string VARIABLES_FILENAME = $"iRacingVariables-{timeStamp}.csv";
             string SESSIONINFO_FILENAME = $"IRacingSessionInfo-{timeStamp}.yaml";
-            // amount of time to wait for data
+            // amount of time to wait for data before giving up
             const int WAIT_FOR_DATA_SECS = 30;
 
             IEnumerable<TelemetryVariable>? telemetryVariables = null;
             string? rawSessionInfoYaml = null;
-            CancellationTokenSource cts = new CancellationTokenSource();
 
             // if you pass in a IBT filename, we'll use that, otherwise default to LIVE mode
             var ibtOptions = args.Length == 1 ? new IBTOptions(args[0]) : null;
@@ -49,72 +48,45 @@ namespace DumpVariables_DumpSessionInfo
             // create telemetry client
             await using var tc = TelemetryClient<TelemetryData>.Create(logger, ibtOptions);
 
-            // Note: ConnectStateStream is not available in published NuGet package yet
-            // For now, we'll get telemetry variables when we successfully get data
+            // give up if we don't receive the session info in time
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(WAIT_FOR_DATA_SECS));
 
-            // Start raw session info consumption
-            var rawSessionTask = Task.Run(async () =>
+            // collect the session info and variables list from the first session info update, then exit
+            var handlers = new TelemetryHandlers<TelemetryData>
             {
-                await foreach (var rawYaml in tc.SessionDataYaml.WithCancellation(cts.Token))
+                OnRawSessionInfoUpdate = rawYaml =>
                 {
-                    OnRawSessionInfoUpdate(rawYaml);
-                }
-            }, cts.Token);
+                    rawSessionInfoYaml = rawYaml;
 
-            // Start monitoring - exit when we receive the session info
-            var monitorTask = tc.Monitor(cts.Token);
+                    // the variables list is available once we're connected, which is true by the
+                    // time session info arrives. note: GetTelemetryVariables() is synchronous
+                    telemetryVariables = tc.GetTelemetryVariables();
 
-            DateTime startTime = DateTime.Now;
-            while (DateTime.Now < startTime + TimeSpan.FromSeconds(WAIT_FOR_DATA_SECS))
-            {
-                if (telemetryVariables != null && rawSessionInfoYaml != null)
-                {
-                    // save telemetryVariables to file
-                    writeVariablesFile(telemetryVariables);
-
-                    // save sessionInfo yaml to file
-                    writeSessionInfoFile(rawSessionInfoYaml);
-
-                    // now that we have both 'telemetryVariables' and 'sessionInfo'
-                    // we can cancel the monitoring
+                    // we have everything we need, so stop monitoring
                     cts.Cancel();
-                    break;
+                    return Task.CompletedTask;
                 }
+            };
 
-                // Get telemetry variables if we haven't already and client is connected
-                if (telemetryVariables == null && tc.IsConnected)
-                {
-                    try
-                    {
-                        telemetryVariables = tc.GetTelemetryVariables();
-                    }
-                    catch
-                    {
-                        // Ignore errors, we'll try again
-                    }
-                }
+            // start monitoring - returns when we cancel (data received) or the timeout elapses
+            await tc.Monitor(handlers, cts.Token);
 
-                logger.LogInformation("waiting for telemetry data... {elapsed} secs", (DateTime.Now - startTime).TotalSeconds.ToString("F1"));
-                await Task.Delay(TimeSpan.FromSeconds(1));
-            }
-
-            // wait for 2 seconds to exit
-            var success = await Task.WhenAny(
-                Task.WhenAll(monitorTask, rawSessionTask),
-                Task.Delay(2000));
-            logger.LogInformation("Done. Status: {status}", success.IsCompleted ? "successful" : "timeout");
-
-
-
-            // raw sessionInfo handler
-            void OnRawSessionInfoUpdate(string sessionInfoYaml)
+            // if we have data, save it
+            if (telemetryVariables != null && rawSessionInfoYaml != null)
             {
-                // if we already have the rawSessionInfoYaml, no more work to do
-                if (rawSessionInfoYaml != null)
-                    return;
+                // save telemetryVariables to file
+                writeVariablesFile(telemetryVariables);
 
-                rawSessionInfoYaml = sessionInfoYaml;
+                // save sessionInfo yaml to file
+                writeSessionInfoFile(rawSessionInfoYaml);
+
+                logger.LogInformation("Done. Status: successful");
             }
+            else
+            {
+                logger.LogWarning("Done. Status: timeout - no session info received within {secs} secs", WAIT_FOR_DATA_SECS);
+            }
+
 
             void writeVariablesFile(IEnumerable<TelemetryVariable> variables)
             {
@@ -146,4 +118,3 @@ namespace DumpVariables_DumpSessionInfo
 
     }
 }
-

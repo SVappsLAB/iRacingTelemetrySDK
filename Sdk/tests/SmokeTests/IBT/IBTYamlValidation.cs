@@ -5,6 +5,7 @@ using SVappsLAB.iRacingTelemetrySDK.YamlParsing;
 
 namespace SmokeTests;
 
+[Trait("Category", "manual")]
 public class IBTYamlValidation
 {
     private readonly ITestOutputHelper _output;

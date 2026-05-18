@@ -54,14 +54,14 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="xunit.v3" Version="3.2.2" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.5" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.5" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.8" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\SVappsLAB.iRacingTelemetrySDK\SVappsLAB.iRacingTelemetrySDK.csproj" />
     <ProjectReference Include="..\..\SVappsLAB.iRacingTelemetrySDK.EnumsAndFlags\SVappsLAB.iRacingTelemetrySDK.EnumsAndFlags.csproj" OutputItemType="Analyzer" />
-    <ProjectReference Include="..\..\SVappsLAB.iRacingTelemetrySDK.CodeGen\SVappsLAB.iRacingTelemetrySDK.CodeGen.csproj" OutputItemType="Analyzer" />
+    <ProjectReference Include="..\..\SVappsLAB.iRacingTelemetrySDK.CodeGen\SVappsLAB.iRacingTelemetrySDK.CodeGen.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
 </Project>

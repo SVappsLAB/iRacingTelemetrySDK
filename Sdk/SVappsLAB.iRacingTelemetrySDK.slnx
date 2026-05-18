@@ -1,0 +1,23 @@
+<Solution>
+  <Folder Name="/docs/">
+    <File Path="../docs/ADVANCED.md" />
+    <File Path="../docs/MIGRATION_GUIDE.md" />
+  </Folder>
+  <Folder Name="/docs/ai/">
+    <File Path="../docs/ai/SDK_REFERENCE.md" />
+    <File Path="../docs/ai/SDK_USAGE.md" />
+  </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path="../AGENTS.md" />
+    <File Path="../CLAUDE.md" />
+    <File Path="../NUGET.md" />
+    <File Path="../README.md" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/SmokeTests/SmokeTests.csproj" />
+    <Project Path="tests/UnitTests/UnitTests.csproj" />
+  </Folder>
+  <Project Path="SVappsLAB.iRacingTelemetrySDK.CodeGen/SVappsLAB.iRacingTelemetrySDK.CodeGen.csproj" />
+  <Project Path="SVappsLAB.iRacingTelemetrySDK.EnumsAndFlags/SVappsLAB.iRacingTelemetrySDK.EnumsAndFlags.csproj" />
+  <Project Path="SVappsLAB.iRacingTelemetrySDK/SVappsLAB.iRacingTelemetrySDK.csproj" />
+</Solution>

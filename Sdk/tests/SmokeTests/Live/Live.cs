@@ -19,6 +19,7 @@ using SVappsLAB.iRacingTelemetrySDK;
 
 namespace SmokeTests;
 
+[Trait("Category", "live")]
 public class Live : Base<Live>
 {
     const int TIMEOUT_SECS = 5;
@@ -44,16 +45,20 @@ public class Live : Base<Live>
 
     [Theory]
     [MemberData(nameof(TestModes))]
-    public async Task VerifyAllVariablesAreCovered(string _mode, Func<ILogger, ITelemetryClient<TelemetryData>> clientFactory)
+    public async Task VerifyAllVariablesAreCovered(string mode, Func<ILogger, ITelemetryClient<TelemetryData>> clientFactory)
     {
+        Assert.NotEmpty(mode);
+
         await using var client = clientFactory(_logger);
         await BaseVerifyAllVariablesCovered(client, TIMEOUT_SECS);
     }
 
     [Theory]
     [MemberData(nameof(TestModes))]
-    public async Task VerifyModelMatchesRawYaml(string _mode, Func<ILogger, ITelemetryClient<TelemetryData>> clientFactory)
+    public async Task VerifyModelMatchesRawYaml(string mode, Func<ILogger, ITelemetryClient<TelemetryData>> clientFactory)
     {
+        Assert.NotEmpty(mode);
+
         await using var client = clientFactory(_logger);
         await BaseVerifyModelMatchesRawYaml(client, TIMEOUT_SECS);
     }

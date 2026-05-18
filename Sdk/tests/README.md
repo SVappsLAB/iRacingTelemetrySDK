@@ -1,33 +1,44 @@
 # Testing
 
-## unit tests
+## Unit Tests
 
-simple tests for individual classes and functions. 
+Unit tests cover individual classes and functions without requiring iRacing or live telemetry.
 
-can be run anytime.
+```powershell
+dotnet test .\Sdk\tests\UnitTests\UnitTests.csproj
+```
 
-    dotnet test --filter unit
+## Offline IBT Smoke Tests
 
-## offline
+IBT smoke tests use bundled `.ibt` files under `Sdk/tests/SmokeTests/data/ibt` and are the preferred repeatable smoke test set.
 
-**IBT_Tests** - this project loads and extracts data from IBT files in the `IBT_Tests/data` directory
+```powershell
+dotnet run --project .\Sdk\tests\SmokeTests\SmokeTests.csproj -- --filter-trait Category=ibt
+```
 
-can be run anytime.
+## Live Smoke Tests
 
-	dotnet test --filter ibt
+Live tests require iRacing running on Windows in an active session. Load a track and car, get into the car so the simulator sends telemetry data, then run:
 
-## online
+```powershell
+dotnet run --project .\Sdk\tests\SmokeTests\SmokeTests.csproj -- --filter-trait Category=live
+```
 
-**Live_Tests** - this project connects to a running instance of iRacing, and pulls data from the sim
+## Manual Tests
 
-these tests can **only** be run against iRacing, in a live session.
+Manual tests depend on local developer setup, local telemetry files, timing-sensitive behavior, or deliberate inspection. Run them intentionally:
 
-to run these tests
-1. load a track and car in iRacing
-1. you must get **into** the car, so the sim is sending telemetry data (sitting in the pits is fine)
-1. run the `Live_Tests` project
+```powershell
+dotnet run --project .\Sdk\tests\SmokeTests\SmokeTests.csproj -- --filter-trait Category=manual
+dotnet run --project .\Sdk\tests\UnitTests\UnitTests.csproj -- --filter-trait Category=manual
+```
 
-    dotnet test --filter live
+## All Tests
 
+The full solution test run may include tests that require live iRacing data or local manual-test setup.
 
+```powershell
+dotnet test .\Sdk\SVappsLAB.iRacingTelemetrySDK.slnx
+```
 
+Do not rely on `dotnet test --filter unit`, `--filter ibt`, or `--filter live` with the current Microsoft.Testing.Platform setup; those VSTest-style filters are ignored. Use `--filter-trait Category=...` with `dotnet run --project` for filtered MTP test runs.

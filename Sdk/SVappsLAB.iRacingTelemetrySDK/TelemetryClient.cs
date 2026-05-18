@@ -97,7 +97,11 @@ namespace SVappsLAB.iRacingTelemetrySDK
     {
         const int DATA_READY_TIMEOUT_MS = 30;
         const int INITIALIZATION_DELAY_MS = 1000;
-        private const int CHANNEL_SIZE = 60;
+        private const int CHANNEL_SIZE = 60;        // 1 seconds of buffering at 60 Hz - helps slow consumers
+        private const string MONITOR_UNAVAILABLE_MESSAGE =
+            "Monitor() is already running or has already completed on this instance. " +
+            "Create a new TelemetryClient instance to monitor again.";
+        private static readonly TimeSpan HANDLER_SHUTDOWN_TIMEOUT = TimeSpan.FromSeconds(5);
         readonly Channel<ConnectState> _connectStateChannel;
         readonly Channel<Exception> _errorChannel;
         readonly Channel<string> _rawSessionDataChannel;
@@ -125,6 +129,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
 
         // Monitor state tracking - 0=idle, 1=running
         private int _monitorState = 0;
+        private int _monitorStarted = 0;
 
         // telemetry variables caching
         private IReadOnlyList<TelemetryVariable>? _cachedTelemetryVariables;
@@ -278,20 +283,71 @@ namespace SVappsLAB.iRacingTelemetrySDK
         /// </remarks>
         public async Task<int> Monitor(CancellationToken ct)
         {
-            // check if channels have already been completed from a previous run
-            if (_telemetryDataChannel.Reader.Completion.IsCompleted)
+            BeginMonitor();
+            return await RunMonitor(ct).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc />
+        public async Task<int> Monitor(TelemetryHandlers<T> handlers, CancellationToken ct)
+        {
+            ArgumentNullException.ThrowIfNull(handlers);
+
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+
+            BeginMonitor();
+
+            var subscriptionTask = SubscribeToHandlers(handlers, linkedCts);
+            var monitorTask = RunMonitor(linkedCts.Token);
+
+            var completedTask = await Task.WhenAny(monitorTask, subscriptionTask).ConfigureAwait(false);
+
+            if (completedTask == subscriptionTask && subscriptionTask.IsFaulted)
             {
-                throw new InvalidOperationException(
-                    "Monitor() has already completed on this instance. " +
-                    "Create a new TelemetryClient instance to monitor again.");
+                linkedCts.Cancel();
+            }
+
+            try
+            {
+                var result = await monitorTask.ConfigureAwait(false);
+                await WaitForHandlersToComplete(subscriptionTask).ConfigureAwait(false);
+
+                return result;
+            }
+            catch
+            {
+                linkedCts.Cancel();
+
+                try
+                {
+                    await WaitForHandlersToComplete(subscriptionTask).ConfigureAwait(false);
+                }
+                catch
+                {
+                    // Preserve the original monitor or handler exception.
+                }
+
+                throw;
+            }
+        }
+
+        private void BeginMonitor()
+        {
+            if (Interlocked.CompareExchange(ref _monitorStarted, 1, 0) != 0)
+            {
+                throw new InvalidOperationException(MONITOR_UNAVAILABLE_MESSAGE);
             }
 
             // atomically check and set monitor state to prevent re-entrancy
             // compareExchange returns the original value - if it was 0 (idle), we successfully set it to 1 (running)
             if (Interlocked.CompareExchange(ref _monitorState, 1, 0) != 0)
             {
-                throw new InvalidOperationException("Monitor() is already running. concurrent calls to Monitor() are not allowed.");
+                throw new InvalidOperationException(MONITOR_UNAVAILABLE_MESSAGE);
             }
+        }
+
+        private async Task<int> RunMonitor(CancellationToken ct)
+        {
+            Exception? monitorException = null;
 
             try
             {
@@ -312,14 +368,111 @@ namespace SVappsLAB.iRacingTelemetrySDK
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error starting processing tasks");
+                    monitorException = ex;
                     throw;
                 }
             }
             finally
             {
+                CompleteAllChannels(monitorException);
+                _internalCts?.Dispose();
+                _internalCts = null;
+
                 // reset monitor state to idle on any exit path (success, exception, cancellation)
                 // this ensures state is cleaned up even if Monitor() throws during startup
                 Interlocked.Exchange(ref _monitorState, 0);
+            }
+        }
+
+        private Task SubscribeToHandlers(TelemetryHandlers<T> handlers, CancellationTokenSource faultCts)
+        {
+            var tasks = new List<Task>();
+
+            if (handlers.OnTelemetryUpdate != null)
+                tasks.Add(RunHandlerLoop(HandleTelemetryData(handlers.OnTelemetryUpdate), faultCts));
+
+            if (handlers.OnSessionInfoUpdate != null)
+                tasks.Add(RunHandlerLoop(HandleSessionData(handlers.OnSessionInfoUpdate), faultCts));
+
+            if (handlers.OnRawSessionInfoUpdate != null)
+                tasks.Add(RunHandlerLoop(HandleRawSessionData(handlers.OnRawSessionInfoUpdate), faultCts));
+
+            if (handlers.OnConnectStateChanged != null)
+                tasks.Add(RunHandlerLoop(HandleConnectStates(handlers.OnConnectStateChanged), faultCts));
+
+            if (handlers.OnError != null)
+                tasks.Add(RunHandlerLoop(HandleErrors(handlers.OnError), faultCts));
+
+            return tasks.Count == 0 ? Task.CompletedTask : Task.WhenAll(tasks);
+        }
+
+        // a faulting handler must stop monitoring promptly, even when other handlers are
+        // still draining their streams. cancelling the shared token makes RunMonitor exit,
+        // which completes the channels and lets the remaining handler loops end.
+        private static async Task RunHandlerLoop(Task handlerLoop, CancellationTokenSource faultCts)
+        {
+            try
+            {
+                await handlerLoop.ConfigureAwait(false);
+            }
+            catch
+            {
+                faultCts.Cancel();
+                throw;
+            }
+        }
+
+        private async Task WaitForHandlersToComplete(Task subscriptionTask)
+        {
+            try
+            {
+                await subscriptionTask.WaitAsync(HANDLER_SHUTDOWN_TIMEOUT).ConfigureAwait(false);
+            }
+            catch (TimeoutException ex)
+            {
+                throw new TimeoutException(
+                    "Telemetry handler did not complete within 5 seconds during shutdown. Ensure callbacks return promptly.",
+                    ex);
+            }
+        }
+
+        private async Task HandleTelemetryData(Func<T, Task> handler)
+        {
+            await foreach (var data in TelemetryData.ConfigureAwait(false))
+            {
+                await handler(data).ConfigureAwait(false);
+            }
+        }
+
+        private async Task HandleSessionData(Func<TelemetrySessionInfo, Task> handler)
+        {
+            await foreach (var data in SessionData.ConfigureAwait(false))
+            {
+                await handler(data).ConfigureAwait(false);
+            }
+        }
+
+        private async Task HandleRawSessionData(Func<string, Task> handler)
+        {
+            await foreach (var data in SessionDataYaml.ConfigureAwait(false))
+            {
+                await handler(data).ConfigureAwait(false);
+            }
+        }
+
+        private async Task HandleConnectStates(Func<ConnectState, Task> handler)
+        {
+            await foreach (var data in ConnectStates.ConfigureAwait(false))
+            {
+                await handler(data).ConfigureAwait(false);
+            }
+        }
+
+        private async Task HandleErrors(Func<Exception, Task> handler)
+        {
+            await foreach (var data in Errors.ConfigureAwait(false))
+            {
+                await handler(data).ConfigureAwait(false);
             }
         }
 
@@ -343,7 +496,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
             finally
             {
                 // complete the session info channel. there will be no more data
-                _internalSessionInfoChannel.Writer.Complete();
+                _internalSessionInfoChannel.Writer.TryComplete();
             }
         }
 
@@ -574,15 +727,15 @@ namespace SVappsLAB.iRacingTelemetrySDK
             }
         }
 
-        private void CompleteAllChannels()
+        private void CompleteAllChannels(Exception? exception = null)
         {
             try
             {
-                _connectStateChannel.Writer.Complete();
-                _errorChannel.Writer.Complete();
-                _rawSessionDataChannel.Writer.Complete();
-                _sessionDataChannel.Writer.Complete();
-                _telemetryDataChannel.Writer.Complete();
+                _connectStateChannel.Writer.TryComplete(exception);
+                _errorChannel.Writer.TryComplete(exception);
+                _rawSessionDataChannel.Writer.TryComplete(exception);
+                _sessionDataChannel.Writer.TryComplete(exception);
+                _telemetryDataChannel.Writer.TryComplete(exception);
             }
             catch (Exception ex)
             {
@@ -686,7 +839,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
                 catch (OperationCanceledException) when (ct.IsCancellationRequested)
                 {
                     _logger.LogDebug("Live data monitoring cancelled after {numUpdates} updates", numUpdates);
-                    throw; // propagate cancellation to caller
+                    return numUpdates;
                 }
                 catch (Exception e)
                 {
@@ -694,7 +847,15 @@ namespace SVappsLAB.iRacingTelemetrySDK
                     _errorChannel.Writer.TryWrite(e);
 
                     // For other exceptions, wait a bit before retrying
-                    await Task.Delay(1000).ConfigureAwait(false);
+                    try
+                    {
+                        await Task.Delay(1000, ct).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                    {
+                        _logger.LogDebug("Live data monitoring cancelled after {numUpdates} updates", numUpdates);
+                        return numUpdates;
+                    }
                 }
             }
 
@@ -841,7 +1002,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
             catch (OperationCanceledException) when (token.IsCancellationRequested)
             {
                 _logger.LogDebug("IBT data processing cancelled after {numRecords} records", numRecords);
-                throw; // propagate cancellation to caller
+                return numRecords;
             }
             catch (Exception e)
             {
