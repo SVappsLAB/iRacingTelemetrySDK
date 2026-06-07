@@ -67,7 +67,7 @@ namespace UnitTests
             };
 
         [Theory]
-        [Trait("Category", "Manual")]
+        [Trait("Category", "manual")]
         [MemberData(nameof(Data))]
         public async Task GovernorTests(int speedMultiplier, int secsOfDataToSimulate)
         {
@@ -93,6 +93,5 @@ namespace UnitTests
         }
     }
 }
-
 
 

@@ -15,10 +15,12 @@ Perfect for building **real-time dashboards**, **data analysis tools**, **race e
 - [Getting Started](#getting-started)
 - [Understanding Telemetry Variables](#understanding-telemetry-variables)
 - [Samples](#samples)
+- [Advanced Usage](./docs/ADVANCED.md)
 - [Documentation](#documentation)
 - [AI-Assisted Development](#ai-assisted-development)
 - [Performance and Design](#performance-and-design)
 - [Performance Monitoring](#performance-monitoring)
+- [Building from Source](#building-from-source)
 - [License](#license)
 
 ## Features
@@ -36,7 +38,6 @@ Perfect for building **real-time dashboards**, **data analysis tools**, **race e
 
 - **.NET 8.0+**
 - **Windows** for live iRacing telemetry
-- **Cross-platform** for IBT file playback
 
 ## Quick Example
 
@@ -55,15 +56,16 @@ public class Program
 
         using var cts = new CancellationTokenSource();
 
-        var subscriptionTask = client.SubscribeToAllStreams(
-            onTelemetryUpdate: async data =>
-                Console.WriteLine($"Speed: {data.Speed}, RPM: {data.RPM}"),
-            cancellationToken: cts.Token
-        );
+        var handlers = new TelemetryHandlers<TelemetryData>
+        {
+            OnTelemetryUpdate = data =>
+            {
+                Console.WriteLine($"Speed: {data.Speed}, RPM: {data.RPM}");
+                return Task.CompletedTask;
+            }
+        };
 
-        var monitorTask = client.Monitor(cts.Token);
-
-        await Task.WhenAny(monitorTask, subscriptionTask);
+        await client.Monitor(handlers, cts.Token);
     }
 }
 ```
@@ -92,7 +94,7 @@ To incorporate **iRacingTelemetrySDK** into your projects, follow these steps:
     }
     ```
 
-    A source generator will be leveraged to create a new .Net `TelemetryData` type you can use in your code.  For the attribute above, the created type will look like
+    A source generator will be leveraged to create a new .NET `TelemetryData` type you can use in your code.  For the attribute above, the created type will look like
 
     ```csharp
     public record struct TelemetryData
@@ -135,89 +137,56 @@ To incorporate **iRacingTelemetrySDK** into your projects, follow these steps:
 
 1. Subscribe to data streams
 
-    The async streaming API provides two consumption patterns:
+    Pass a `TelemetryHandlers<T>` to `Monitor(...)`; it consumes the streams for you and returns when monitoring ends:
 
-    **Option A: Extension Method (Can be used for simple scenarios)**
     ```csharp
-    // Subscribe to all data streams with async delegate methods for simplified consumption
-    var subscriptionTask = tc.SubscribeToAllStreams(
-        onTelemetryUpdate: OnTelemetryUpdate,
-        onSessionInfoUpdate: OnSessionInfoUpdate,
-        onConnectStateChanged: OnConnectStateChanged,
-        onError: OnError,
-        cancellationToken: cts.Token);
-
-    // Async event handler methods
-    Task OnTelemetryUpdate(TelemetryData data)
+    var handlers = new TelemetryHandlers<TelemetryData>
     {
-        // Properties are nullable - handle accordingly
-        var speed = data.Speed?.ToString("F1") ?? "N/A";
-        var rpm = data.RPM?.ToString("F0") ?? "N/A";
+        OnTelemetryUpdate = data =>
+        {
+            // Properties are nullable - handle accordingly
+            var speed = data.Speed?.ToString("F1") ?? "N/A";
+            var rpm = data.RPM?.ToString("F0") ?? "N/A";
 
-        logger.LogInformation("Speed: {speed} mph, RPM: {rpm}", speed, rpm);
-        return Task.CompletedTask;
-    }
+            logger.LogInformation("Speed: {speed} mph, RPM: {rpm}", speed, rpm);
+            return Task.CompletedTask;
+        },
+        OnSessionInfoUpdate = session =>
+        {
+            var driverCount = session.DriverInfo?.Drivers?.Count ?? 0;
+            logger.LogInformation("Drivers in session: {count}", driverCount);
+            return Task.CompletedTask;
+        },
+        OnConnectStateChanged = state =>
+        {
+            logger.LogInformation("Connection: {state}", state);
+            return Task.CompletedTask;
+        },
+        OnError = error =>
+        {
+            logger.LogError(error, "Telemetry error");
+            return Task.CompletedTask;
+        }
+    };
 
-    Task OnSessionInfoUpdate(TelemetrySessionInfo session)
-    {
-        var driverCount = session.DriverInfo?.Drivers?.Count ?? 0;
-        logger.LogInformation("Drivers in session: {count}", driverCount);
-        return Task.CompletedTask;
-    }
+    await tc.Monitor(handlers, cts.Token);
     ```
 
-    **Option B: Direct Stream Access (For advanced scenarios)**
-    ```csharp
-    // Consume data streams directly for maximum performance and flexibility
-    var telemetryTask = Task.Run(async () =>
-    {
-        await foreach (var data in tc.TelemetryData.WithCancellation(cts.Token))
-        {
-            // Handle nullable properties explicitly
-            if (data.Speed.HasValue && data.RPM.HasValue)
-            {
-                logger.LogInformation("Speed: {speed:F1}, RPM: {rpm:F0}",
-                    data.Speed.Value, data.RPM.Value);
-            }
-        }
-    }, cts.Token);
+    > **`OnError` vs. handler exceptions:** `OnError` receives only *SDK-side* processing errors (for example a failed YAML parse or a read error). Exceptions thrown by your own handler code are **not** routed to `OnError` — they fault the `Monitor(...)` call directly so bugs surface loudly rather than being silently swallowed. If a handler has recoverable per-item failures, wrap that work in a `try/catch` inside the handler.
 
-    var sessionTask = Task.Run(async () =>
-    {
-        await foreach (var session in tc.SessionData.WithCancellation(cts.Token))
-        {
-            var trackName = session.WeekendInfo?.TrackName ?? "Unknown";
-            logger.LogInformation("Track: {track}", trackName);
-        }
-    }, cts.Token);
-    ```
+    Need multiple independent consumers, custom backpressure, or maximum IBT throughput? See **[Advanced usage](./docs/ADVANCED.md)**.
 
 1. Monitor for data changes
 
     The client uses multiple tasks (multi-threading) to monitor all iRacing data. Monitoring stops when the `CancellationToken` is cancelled (or when end-of-file is reached for IBT files).
 
-    **For Extension Method approach:**
     ```csharp
     using var cts = new CancellationTokenSource();
 
     // cancel on Ctrl+C
     Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
 
-    // Start both monitoring and subscription tasks concurrently
-    var monitorTask = tc.Monitor(cts.Token);
-
-    await Task.WhenAny(monitorTask, subscriptionTask);
-    ```
-
-    **For Direct Stream approach:**
-    ```csharp
-    using var cts = new CancellationTokenSource();
-    Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
-
-    // Start monitoring and all consumption tasks concurrently
-    var monitorTask = tc.Monitor(cts.Token);
-
-    await Task.WhenAny(monitorTask, telemetryTask, sessionTask);
+    await tc.Monitor(handlers, cts.Token);
     ```
 
 ## Understanding Telemetry Variables
@@ -265,26 +234,27 @@ See [Samples Directory](./Samples/README.md) for ready-to-run example projects i
 
 ## Documentation
 
-- **[Migration Guide](./MIGRATION_GUIDE.md)** - Upgrading from early pre-1.0 releases
-- **[AI Agent Guide](./Sdk/SVappsLAB.iRacingTelemetrySDK/contents/.ai/AGENTS.md)** - Support for AI coding agents: SDK rules, patterns, and examples
+- **[Advanced Usage](./docs/ADVANCED.md)** - Direct stream access, multiple consumers, and cancellation behavior
+- **[Migration Guide](./docs/MIGRATION_GUIDE.md)** - Upgrading from early pre-1.0 releases
 
 ## AI-Assisted Development
 
-This package includes an **AI agent guide** that can be referenced in your project.
+To use this repo as part of your own consuming application, point your AI coding agent to these repository docs:
+
+- **[SDK usage guide for agents](./docs/ai/SDK_USAGE.md)** - Recommended usage for consumer applications.
+- **[Advanced SDK reference for agents](./docs/ai/SDK_REFERENCE.md)** - Advanced stream, metrics, DI, and troubleshooting patterns.
+
+To have your agent use them automatically, add a line like this to your project's `AGENTS.md`, `CLAUDE.md`, or `.cursorrules` (your agent needs the ability to fetch URLs):
 
 ```
-.ai/SVappsLAB.iRacingTelemetrySDK/AGENTS.md
-```
-
-Point your AI coding agent to this file for SDK-specific patterns, complete examples, and common pitfalls. For example, reference this file in your prompt, or add this to your project's `AGENTS.md`, `CLAUDE.md`, `.cursorrules`, so it's always available:
-
-```
-When working with iRacing telemetry, read the .ai/SVappsLAB.iRacingTelemetrySDK/AGENTS.md reference for SDK usage rules and examples.
+When working with the iRacing Telemetry SDK, read
+https://raw.githubusercontent.com/SVappsLAB/iRacingTelemetrySDK/main/docs/ai/SDK_USAGE.md first,
+and https://raw.githubusercontent.com/SVappsLAB/iRacingTelemetrySDK/main/docs/ai/SDK_REFERENCE.md for advanced patterns.
 ```
 
 ## Performance and Design
 
-The SDK is designed for high performance with zero data loss through async data streaming architecture.
+The SDK is designed for high performance with bounded async data streaming that keeps telemetry current under load.
 
 ### Data Streaming Benefits
 
@@ -301,7 +271,7 @@ The SDK is designed for high performance with zero data loss through async data 
 - **600,000+ records/sec** processing capability for IBT files
 
 **Flexibility:**
-- **Two consumption patterns**: Simple extension methods or direct stream access
+- **Two consumption patterns**: Handler callbacks (`Monitor(handlers, ct)`) or direct stream access
 - **Independent streams**: Consume only the data types you need
 - **Cancellation support**: Graceful shutdown with `CancellationToken`
 
@@ -415,6 +385,53 @@ dotnet-counters monitor --name "YourApp" --counters SVappsLAB.iRacingTelemetrySD
 ```
 
 This helps identify performance bottlenecks, monitor processing rates, and detect if records are being dropped due to slow consumption.
+
+## Building from Source
+
+If you've cloned or forked the repository, you can build, test, and package the SDK with the standard .NET CLI from the repository root.
+
+```bash
+# build the SDK solution
+dotnet build .\Sdk\SVappsLAB.iRacingTelemetrySDK.slnx
+
+# build the sample solution
+dotnet build .\Samples\Samples.slnx
+
+# create a NuGet package
+dotnet pack .\Sdk\SVappsLAB.iRacingTelemetrySDK\SVappsLAB.iRacingTelemetrySDK.csproj
+```
+
+### Running tests
+
+Tests are split into categories so you can run subsets based on your environment. Live tests require iRacing to be running on Windows.
+
+```bash
+# unit tests only
+dotnet test .\Sdk\tests\UnitTests\UnitTests.csproj
+
+# repeatable offline smoke tests using bundled IBT files
+dotnet run --project .\Sdk\tests\SmokeTests\SmokeTests.csproj -- --filter-trait Category=ibt
+
+# live smoke tests, requires an active iRacing session
+dotnet run --project .\Sdk\tests\SmokeTests\SmokeTests.csproj -- --filter-trait Category=live
+
+# all test projects, including tests that may require live/manual setup
+dotnet test .\Sdk\SVappsLAB.iRacingTelemetrySDK.slnx
+```
+
+See [Sdk/tests/README.md](./Sdk/tests/README.md) for manual test commands and filtering notes.
+
+### Running the samples
+
+```bash
+# live iRacing data
+dotnet run
+
+# IBT file playback
+dotnet run path/to/file.ibt
+```
+
+See the [Samples](./Samples/README.md) directory for the individual example projects.
 
 ## License
 

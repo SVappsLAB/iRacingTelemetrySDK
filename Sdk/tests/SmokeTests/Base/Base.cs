@@ -45,60 +45,58 @@ public abstract partial class Base<T> where T : class
         SessionSummary? _sessionInfoSummary = null;
         var connectionStateReceived = false;
 
-        // monitor the data streams, until cancelled
-        using var dataTasksCancellationSource = new CancellationTokenSource();
-
-        var dataTasks = new[]
-        {
-            MonitorData<TelemetryData>(client.TelemetryData, async telemetryData =>
-            {
-                Assert.True(telemetryData.RPM.HasValue);
-                Assert.True(telemetryData.RPM > 200);
-                Assert.True(telemetryData.CarIdxTrackSurface == null || telemetryData.CarIdxTrackSurface.Length >= 64);
-
-                // only need one sample
-                if (_variableSummary is null) {
-                    var telemetryVars = client.GetTelemetryVariables();
-                    var variableSummary = VariableSummary.Create(telemetryVars);
-                    _variableSummary = variableSummary;
-                }
-            }, dataTasksCancellationSource.Token),
-
-            MonitorData<TelemetrySessionInfo>(client.SessionData, async sessionInfo =>
-            {
-                Assert.NotNull(sessionInfo);
-                Assert.NotEmpty(sessionInfo.WeekendInfo.TrackName);
-
-                // only need one sample
-                if (_sessionInfoSummary is null)
-                {
-                    var sessionSummary = SessionSummary.Create(sessionInfo);
-                    _sessionInfoSummary = sessionSummary;
-                }
-            }, dataTasksCancellationSource.Token),
-
-            MonitorData<ConnectState>(client.ConnectStates, async connectState =>
-            {
-                Assert.True(client.IsConnected);
-
-                connectionStateReceived = true;
-            }, dataTasksCancellationSource.Token),
-
-            MonitorData<Exception>(client.Errors, async error =>
-            {
-                Assert.NotNull(error);
-                _output.WriteLine($"Error received: {error.Message}");
-            }, dataTasksCancellationSource.Token),
-        };
-
         // monitor for a few seconds then cancel the operation
         using var timeoutTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(TIMEOUT_SECS));
-        await client.Monitor(timeoutTokenSource.Token);
+        await client.Monitor(
+            new TelemetryHandlers<TelemetryData>
+            {
+                OnTelemetryUpdate = telemetryData =>
+                {
+                    Assert.True(telemetryData.RPM.HasValue);
+                    Assert.True(telemetryData.RPM > 200);
+                    Assert.True(telemetryData.CarIdxTrackSurface == null || telemetryData.CarIdxTrackSurface.Length >= 64);
 
+                    // only need one sample
+                    if (_variableSummary is null) {
+                        var telemetryVars = client.GetTelemetryVariables();
+                        var variableSummary = VariableSummary.Create(telemetryVars);
+                        _variableSummary = variableSummary;
+                    }
 
-        // when the timeout occurs, we are done monitoring the data streams, so cancel them.
-        dataTasksCancellationSource.Cancel();
-        await Task.WhenAll(dataTasks);  // wait for them to complete
+                    return Task.CompletedTask;
+                },
+                OnSessionInfoUpdate = sessionInfo =>
+                {
+                    Assert.NotNull(sessionInfo);
+                    Assert.NotEmpty(sessionInfo.WeekendInfo.TrackName);
+
+                    // only need one sample
+                    if (_sessionInfoSummary is null)
+                    {
+                        var sessionSummary = SessionSummary.Create(sessionInfo);
+                        _sessionInfoSummary = sessionSummary;
+                    }
+
+                    return Task.CompletedTask;
+                },
+                OnConnectStateChanged = connectState =>
+                {
+                    if (connectState == ConnectState.Connected)
+                    {
+                        Assert.True(client.IsConnected);
+                        connectionStateReceived = true;
+                    }
+
+                    return Task.CompletedTask;
+                },
+                OnError = error =>
+                {
+                    Assert.NotNull(error);
+                    _output.WriteLine($"Error received: {error.Message}");
+                    return Task.CompletedTask;
+                },
+            },
+            timeoutTokenSource.Token);
 
         Assert.NotNull(_variableSummary);
         _output.WriteLine($"Variables Summary: {_variableSummary}");
@@ -107,27 +105,5 @@ public abstract partial class Base<T> where T : class
         _output.WriteLine($"Session Summary: {_sessionInfoSummary}");
 
         Assert.True(connectionStateReceived);
-    }
-
-    private async Task MonitorData<TData>(
-        IAsyncEnumerable<TData> stream,
-        Func<TData, Task> processItem,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            await foreach (var data in stream.WithCancellation(cancellationToken))
-            {
-                await processItem(data);
-            }
-        }
-        catch (OperationCanceledException e) when (e.CancellationToken.IsCancellationRequested)
-        {
-            // expected when the cancellation token is triggered
-        }
-        catch (Exception ex)
-        {
-            _output.WriteLine($"Error monitoring data streams: {ex.Message}");
-        }
     }
 }

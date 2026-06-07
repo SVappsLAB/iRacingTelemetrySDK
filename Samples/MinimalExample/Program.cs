@@ -40,35 +40,37 @@ namespace MinimalExample
             // 5. Use cancellation token for proper shutdown
             using var cts = new CancellationTokenSource();
 
-            // 6. Subscribe to all telemetryData streams using async delegate methods for simplified consumption
-            // note: SubscribeToAllStreams handles single-reader channel limitation internally - safe for multiple callbacks
-            var subscriptionTask = client.SubscribeToAllStreams(
-                onTelemetryUpdate: async telemetryData =>
+            // 6. Enable graceful shutdown with Ctrl+C
+            Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
+
+            // 7. Define handlers
+            var handlers = new TelemetryHandlers<TelemetryData>
+            {
+                OnTelemetryUpdate = telemetryData =>
                 {
                     Console.WriteLine($"Speed: {telemetryData.Speed}, RPM: {telemetryData.RPM}");
+                    return Task.CompletedTask;
                 },
-                onSessionInfoUpdate: async session =>
+                OnSessionInfoUpdate = session =>
                 {
                     var driverCount = session.DriverInfo?.Drivers?.Count ?? 0;
                     Console.WriteLine($"Drivers: {driverCount}");
+                    return Task.CompletedTask;
                 },
-                onConnectStateChanged: async state =>
+                OnConnectStateChanged = state =>
                 {
                     Console.WriteLine($"Connection: {state}");
+                    return Task.CompletedTask;
                 },
-                onError: async error =>
+                OnError = error =>
                 {
                     Console.WriteLine($"Error: {error.Message}");
-                },
-                cancellationToken: cts.Token);
+                    return Task.CompletedTask;
+                }
+            };
 
-            // 7. Enable graceful shutdown with Ctrl+C
-            Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
-
-            // 8. Start monitoring and wait for completion
-            var monitorTask = client.Monitor(cts.Token);
-
-            await Task.WhenAny(monitorTask, subscriptionTask);
+            // 8. Monitor telemetry data stream until cancellation
+            await client.Monitor(handlers, cts.Token);
         }
     }
 }

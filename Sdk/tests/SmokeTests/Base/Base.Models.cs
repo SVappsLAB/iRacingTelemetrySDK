@@ -30,10 +30,9 @@ public abstract partial class Base<T> where T : class
         bool sessionInfoReceived = false;
         List<string>? missingProperties = null;
 
-        // start raw session info consumption
         var rawSessionTask = Task.Run(async () =>
         {
-            await foreach (var rawYaml in client.SessionDataYaml.WithCancellation(cts.Token))
+            await foreach (var rawYaml in client.SessionDataYaml)
             {
                 sessionInfoReceived = true;
 
@@ -47,13 +46,12 @@ public abstract partial class Base<T> where T : class
                 cts.Cancel();
                 break; // exit after first item
             }
-        }, cts.Token);
+        });
 
         // Start monitoring
         var monitorTask = client.Monitor(cts.Token);
 
-        // Wait for either task to complete
-        await Task.WhenAny(rawSessionTask, monitorTask);
+        await Task.WhenAll(rawSessionTask, monitorTask);
 
         Assert.True(sessionInfoReceived, "Session info was not received within the timeout period.");
 

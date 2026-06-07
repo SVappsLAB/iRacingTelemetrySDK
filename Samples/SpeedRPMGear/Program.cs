@@ -69,14 +69,7 @@ namespace SpeedRPMGear
             using var cts = new CancellationTokenSource();
             var cancellationToken = cts.Token;
 
-            // start telemetry consumption
-            var telemetryTask = Task.Run(async () =>
-            {
-                await foreach (var data in tc.TelemetryData.WithCancellation(cancellationToken))
-                {
-                    OnTelemetryUpdate(data);
-                }
-            }, cancellationToken);
+            Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
 
             // start keyboard monitoring
             // - pause telemetry events when 'p' key is pressed
@@ -85,12 +78,17 @@ namespace SpeedRPMGear
             var keyboardTask = MonitorKeyboardAsync();
 
             // start iRacing monitoring
-            var monitorTask = tc.Monitor(cancellationToken);
+            var handlers = new TelemetryHandlers<TelemetryData>
+            {
+                OnTelemetryUpdate = OnTelemetryUpdate
+            };
+
+            var monitorTask = tc.Monitor(handlers, cancellationToken);
 
             // wait for any task to complete
             // - when 'live', the keyboard task (Ctrl-C) is most likely to complete first (before the iRacing session ends)
             // - when playing 'IBT' files, the monitoring task is most likely to complete first (at end-of-file)
-            await Task.WhenAny(keyboardTask, monitorTask, telemetryTask);
+            await Task.WhenAny(keyboardTask, monitorTask);
 
             // regardless of which task completes first,
             // set the cancellation token so the other tasks can complete
@@ -99,11 +97,11 @@ namespace SpeedRPMGear
             // await for all tasks to complete
             try
             {
-                await Task.WhenAll(monitorTask, keyboardTask, telemetryTask);
+                await Task.WhenAll(monitorTask, keyboardTask);
             }
             catch (OperationCanceledException)
             {
-                // Expected when cancellation is requested
+                // Expected when keyboard delay is cancelled
             }
 
 
@@ -143,4 +141,3 @@ namespace SpeedRPMGear
         }
     }
 }
-

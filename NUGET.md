@@ -34,16 +34,19 @@ Perfect for building:
 
 ## Support for AI-Assisted Development
 
-This package includes an **AI agent guide** that can be referenced in your project.
+Point your AI coding agent to these repository docs:
+
+- **[SDK usage guide for agents](https://github.com/SVappsLAB/iRacingTelemetrySDK/blob/main/docs/ai/SDK_USAGE.md)** - Recommended usage for consumer applications.
+- **[Advanced SDK reference for agents](https://github.com/SVappsLAB/iRacingTelemetrySDK/blob/main/docs/ai/SDK_REFERENCE.md)** - Advanced stream, metrics, DI, and troubleshooting patterns.
+
+These files are hosted in the SDK repository and are not copied into consuming projects by the NuGet package.
+
+To have your agent use them automatically, add a line like this to your project's `AGENTS.md`, `CLAUDE.md`, or `.cursorrules` (your agent needs the ability to fetch URLs):
 
 ```
-.ai/SVappsLAB.iRacingTelemetrySDK/AGENTS.md
-```
-
-Point your AI coding agent to this file for SDK-specific patterns, complete examples, and common pitfalls. For example, reference this file in your prompt, or add this to your project's `AGENTS.md`, `CLAUDE.md`, `.cursorrules`, so it's always available:
-
-```
-When working with iRacing telemetry, read the .ai/SVappsLAB.iRacingTelemetrySDK/AGENTS.md reference for SDK usage rules and examples.
+When working with the iRacing Telemetry SDK, read
+https://raw.githubusercontent.com/SVappsLAB/iRacingTelemetrySDK/main/docs/ai/SDK_USAGE.md first,
+and https://raw.githubusercontent.com/SVappsLAB/iRacingTelemetrySDK/main/docs/ai/SDK_REFERENCE.md for advanced patterns.
 ```
 
 
@@ -77,43 +80,48 @@ public class Program
 
         // 4. Create telemetry client
         await using var client = TelemetryClient<TelemetryData>.Create(logger, ibtOptions);
+
+        // 5. Define handlers (what to do with the telemetry data when it arrives)
+        var handlers = new TelemetryHandlers<TelemetryData>
+        {
+            OnTelemetryUpdate = data =>
+            {
+                Console.WriteLine($"Speed: {data.Speed?.ToString("F1") ?? "N/A"}, RPM: {data.RPM?.ToString("F0") ?? "N/A"}");
+                return Task.CompletedTask;
+            },
+            OnSessionInfoUpdate = session =>
+            {
+                var track = session.WeekendInfo?.TrackDisplayName ?? "unknown";
+                var drivers = session.DriverInfo?.Drivers?.Count ?? 0;
+                Console.WriteLine($"Track: {track}, Drivers: {drivers}");
+                return Task.CompletedTask;
+            },
+            OnConnectStateChanged = state =>
+            {
+                Console.WriteLine($"Connection state: {state}");
+                return Task.CompletedTask;
+            }
+        };
+
+        // Cancellation token to cancel monitoring when needed (e.g. on app shutdown)
         using var cts = new CancellationTokenSource();
 
-        // 5. Subscribe to telemetry and sessionInfo streams
-        var subscriptionTask = client.SubscribeToAllStreams(
-            onTelemetryUpdate: async data =>
-            {
-                Console.WriteLine($"Speed: {data.Speed}, RPM: {data.RPM}");
-            },
-            onSessionInfoUpdate: async session =>
-            {
-                Console.WriteLine($"Track: {session.WeekendInfo.TrackName}, Drivers: {session.DriverInfo.Drivers.Count}");
-            },
-            onConnectStateChanged: async state =>
-            {
-                Console.WriteLine($"Connection state: {state}"); // Connected, Disconnected
-            },
-            cancellationToken: cts.Token
-        );
-
-        // 6. Start monitoring (iRacing data will be processed by your subscription handlers)
-        var monitorTask = client.Monitor(cts.Token);
-
-        await Task.WhenAny(monitorTask, subscriptionTask);
+        // 6. Monitor telemetry data stream
+        await client.Monitor(handlers, cts.Token);
     }
 }
 ```
 
 ## Requirements
 
-- **.NET 8.0+**
+- **.NET 8.0+** — the library targets `net8.0` and is fully compatible with .NET versions 8, 9 and 10
 
 ## Documentation & Examples
 
 - **[Getting Started Guide](https://github.com/SVappsLAB/iRacingTelemetrySDK#readme)** - Setup and basic usage
 - **[Sample Projects](https://github.com/SVappsLAB/iRacingTelemetrySDK/tree/main/Samples)** - Basic monitoring, data export, track analysis
-- **[Implementation Guide](https://github.com/SVappsLAB/iRacingTelemetrySDK/blob/main/Sdk/SVappsLAB.iRacingTelemetrySDK/contents/docs/AI_USAGE.md)** - Deep dive into telemetry APIs and code-generation requirements
-- **[Migration Guide](https://github.com/SVappsLAB/iRacingTelemetrySDK/blob/main/MIGRATION_GUIDE.md)** - Upgrading from previous versions
+- **[Advanced Usage](https://github.com/SVappsLAB/iRacingTelemetrySDK/blob/main/docs/ADVANCED.md)** - Direct stream access, multiple consumers, and cancellation behavior
+- **[Migration Guide](https://github.com/SVappsLAB/iRacingTelemetrySDK/blob/main/docs/MIGRATION_GUIDE.md)** - Upgrading from previous versions
 - **[GitHub Repository](https://github.com/SVappsLAB/iRacingTelemetrySDK)** - Source code and releases
 
 ## License
