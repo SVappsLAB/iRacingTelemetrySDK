@@ -265,7 +265,7 @@ The SDK is designed for high performance with bounded async data streaming that 
 - **Drop-oldest strategy** ensures the SDK never blocks and prioritizes the most recent telemetry
 
 **Performance:**
-- **Lock-free operations** eliminate blocking and contention
+- **Non-blocking bounded streams** reduce contention and keep telemetry current under load
 - **Asynchronous processing** keeps your main thread responsive
 - **~2x performance improvement** over traditional event-based approaches
 - **600,000+ records/sec** processing capability for IBT files
@@ -282,7 +282,7 @@ The SDK is designed for high performance with bounded async data streaming that 
 - **Strongly Typed Telemetry Data**: Use strong type checking throughout
 - **Non-blocking Streams**: All real-time data flows through asynchronous data streams
 - **Separation of Concerns**: Telemetry data (high-frequency, time-critical) and Session Info processing (low frequency, CPU-intensive) run independently
-- **Background Processing**: CPU-intensive YAML parsing runs on a separate thread to prevent any telemetry data drops.
+- **Background Processing**: CPU-intensive YAML parsing runs in an independent async processing task so telemetry data handling stays responsive.
 
 ```mermaid
 graph TB
@@ -425,10 +425,10 @@ See [Sdk/tests/README.md](./Sdk/tests/README.md) for manual test commands and fi
 
 ```bash
 # live iRacing data
-dotnet run
+dotnet run --project .\Samples\MinimalExample\MinimalExample.csproj
 
 # IBT file playback
-dotnet run path/to/file.ibt
+dotnet run --project .\Samples\MinimalExample\MinimalExample.csproj -- path\to\file.ibt
 ```
 
 See the [Samples](./Samples/README.md) directory for the individual example projects.

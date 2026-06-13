@@ -83,7 +83,7 @@ public class IBT : Base<IBT>
     [MemberData(nameof(TestModes))]
     public async Task VerifyModelMatchesRawYaml(string mode, Func<ILogger, ITelemetryClient<TelemetryData>> clientFactory)
     {
-        Assert.NotEmpty(mode);
+        _ = mode;   // used only to name the test cases in the test runner display
 
         await using var client = clientFactory(_logger);
         await BaseVerifyModelMatchesRawYaml(client, TIMEOUT_SECS);
@@ -93,7 +93,7 @@ public class IBT : Base<IBT>
     [MemberData(nameof(TestModes))]
     public async Task VerifyAllVariablesAreCovered(string mode, Func<ILogger, ITelemetryClient<TelemetryData>> clientFactory)
     {
-        Assert.NotEmpty(mode);
+        _ = mode;   // used only to name the test cases in the test runner display
 
         await using var client = clientFactory(_logger);
         await BaseVerifyAllVariablesCovered(client, TIMEOUT_SECS);
@@ -103,7 +103,7 @@ public class IBT : Base<IBT>
     [MemberData(nameof(TestModes))]
     public async Task MonitorCancellationCompletesDirectStreams(string mode, Func<ILogger, ITelemetryClient<TelemetryData>> clientFactory)
     {
-        Assert.NotEmpty(mode);
+        _ = mode;   // used only to name the test cases in the test runner display
 
         await using var client = clientFactory(_logger);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(TIMEOUT_SECS));
@@ -129,7 +129,7 @@ public class IBT : Base<IBT>
     [MemberData(nameof(TestModes))]
     public async Task HandlerExceptionFaultsMonitor(string mode, Func<ILogger, ITelemetryClient<TelemetryData>> clientFactory)
     {
-        Assert.NotEmpty(mode);
+        _ = mode;   // used only to name the test cases in the test runner display
 
         await using var client = clientFactory(_logger);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(TIMEOUT_SECS));
