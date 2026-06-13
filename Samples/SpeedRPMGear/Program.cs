@@ -53,7 +53,7 @@ namespace SpeedRPMGear
                             ibtOptions = new IBTOptions(args[0]);
 
                         var clientOptions = new ClientOptions { MeterFactory = meterFactory };
-                        return TelemetryClient<TelemetryData>.Create(logger, ibtOptions);
+                        return TelemetryClient<TelemetryData>.Create(logger, ibtOptions, clientOptions);
                     });
                 });
 

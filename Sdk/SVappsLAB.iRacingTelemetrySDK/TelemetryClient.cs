@@ -97,7 +97,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
     {
         const int DATA_READY_TIMEOUT_MS = 30;
         const int INITIALIZATION_DELAY_MS = 1000;
-        private const int CHANNEL_SIZE = 60;        // 1 seconds of buffering at 60 Hz - helps slow consumers
+        private const int CHANNEL_SIZE = 60;        // 1 second of buffering at 60 Hz - helps slow consumers
         private const string MONITOR_UNAVAILABLE_MESSAGE =
             "Monitor() is already running or has already completed on this instance. " +
             "Create a new TelemetryClient instance to monitor again.";
@@ -127,8 +127,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
         // Disposal state tracking
         private volatile bool _disposed = false;
 
-        // Monitor state tracking - 0=idle, 1=running
-        private int _monitorState = 0;
+        // one-shot monitor guard - 0=not started, 1=started (never reset)
         private int _monitorStarted = 0;
 
         // telemetry variables caching
@@ -332,14 +331,10 @@ namespace SVappsLAB.iRacingTelemetrySDK
 
         private void BeginMonitor()
         {
+            // atomically claim the one-shot monitor slot. compareExchange returns the original
+            // value - if it was 0 (not started), we successfully claimed it. the flag is never
+            // reset, enforcing both "already running" and "already completed"
             if (Interlocked.CompareExchange(ref _monitorStarted, 1, 0) != 0)
-            {
-                throw new InvalidOperationException(MONITOR_UNAVAILABLE_MESSAGE);
-            }
-
-            // atomically check and set monitor state to prevent re-entrancy
-            // compareExchange returns the original value - if it was 0 (idle), we successfully set it to 1 (running)
-            if (Interlocked.CompareExchange(ref _monitorState, 1, 0) != 0)
             {
                 throw new InvalidOperationException(MONITOR_UNAVAILABLE_MESSAGE);
             }
@@ -367,7 +362,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error starting processing tasks");
+                    _logger.LogError(ex, "Error in processing tasks");
                     monitorException = ex;
                     throw;
                 }
@@ -377,10 +372,6 @@ namespace SVappsLAB.iRacingTelemetrySDK
                 CompleteAllChannels(monitorException);
                 _internalCts?.Dispose();
                 _internalCts = null;
-
-                // reset monitor state to idle on any exit path (success, exception, cancellation)
-                // this ensures state is cleaned up even if Monitor() throws during startup
-                Interlocked.Exchange(ref _monitorState, 0);
             }
         }
 
@@ -417,7 +408,15 @@ namespace SVappsLAB.iRacingTelemetrySDK
             }
             catch
             {
-                faultCts.Cancel();
+                try
+                {
+                    faultCts.Cancel();
+                }
+                catch (ObjectDisposedException)
+                {
+                    // Monitor() already returned (handler-shutdown timeout) and disposed the CTS.
+                    // monitoring is over, so there is nothing left to cancel
+                }
                 throw;
             }
         }
@@ -672,10 +671,18 @@ namespace SVappsLAB.iRacingTelemetrySDK
 
                 // cancel internal CTS to signal graceful shutdown to processing tasks
                 // this ensures tasks can exit their loops cleanly
-                if (_internalCts != null && !_internalCts.IsCancellationRequested)
+                try
                 {
-                    _logger.LogDebug("Cancelling internal processing token");
-                    _internalCts.Cancel();
+                    var internalCts = _internalCts;
+                    if (internalCts != null && !internalCts.IsCancellationRequested)
+                    {
+                        _logger.LogDebug("Cancelling internal processing token");
+                        internalCts.Cancel();
+                    }
+                }
+                catch (ObjectDisposedException)
+                {
+                    // RunMonitor's finally disposed the CTS concurrently - monitoring already ended
                 }
 
                 // shut down processing tasks
