@@ -88,17 +88,7 @@ namespace SVappsLAB.iRacingTelemetrySDK.DataProviders
 
         irsdk_varBuf GetLatestVarBuff()
         {
-            var header = GetHeader();
-
-            var vb = header.varBuf1;
-            if (header.varBuf2.tickCount > vb.tickCount)
-                vb = header.varBuf2;
-            if (header.varBuf3.tickCount > vb.tickCount)
-                vb = header.varBuf3;
-            if (header.varBuf4.tickCount > vb.tickCount)
-                vb = header.varBuf4;
-            return vb;
-
+            return GetHeader().GetMostRecentBuffer();
         }
         public override ValueTask DisposeAsync()
         {

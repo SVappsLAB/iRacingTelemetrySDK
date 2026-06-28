@@ -24,7 +24,15 @@ namespace SVappsLAB.iRacingTelemetrySDK.irSDKDefines
     {
         public const int IRSDK_MAX_BUFS = 4;
         public const int IRSDK_MAX_STRING = 32;
+        // descriptions can be longer than max_string!
         public const int IRSDK_MAX_DESC = 64;
+
+        // define markers for unlimited session lap and time
+        public const int IRSDK_UNLIMITED_LAPS = 32767;
+        public const float IRSDK_UNLIMITED_TIME = 604800.0f;
+
+        // latest version of our telemetry headers
+        public const int IRSDK_VER = 2;
     }
 
     internal enum irsdk_VarType : Int32
@@ -47,28 +55,33 @@ namespace SVappsLAB.iRacingTelemetrySDK.irSDKDefines
     [StructLayout(LayoutKind.Sequential, Pack = 4)]
     internal struct irsdk_varBuf
     {
-        public int tickCount;
-        public int bufOffset;
-        public int pad1;
-        public int pad2;
+        public int tickCount;       // used to detect changes in data (updated AFTER write completes)
+        public int bufOffset;       // offset from header
+        public int tickCountBegin;  // updated BEFORE write starts (for torn read detection)
+        public int pad;             // (16 byte align)
     }
 
     [StructLayout(LayoutKind.Sequential, Pack = 4)]
-    internal struct irsdk_header
+    internal unsafe struct irsdk_header
     {
-        public int ver;
-        public irsdk_StatusField status;
-        public int tickRate;
-        public int sessionInfoUpdate;
-        public int sessionInfoLen;
-        public int sessionInfoOffset;
-        public int numVars;
-        public int varHeaderOffset;
-        public int numBuf;
-        public int bufLen;
-        // padding
-        public int pad1;
-        public int pad2;
+        public int ver;                 // this api header version, see IRSDK_VER
+        public irsdk_StatusField status;// bitfield using irsdk_StatusField
+        public int tickRate;            // ticks per second (60 or 360 etc)
+
+        // session information, updated periodically
+        public int sessionInfoUpdate;   // Incremented when session info changes
+        public int sessionInfoLen;      // Length in bytes of session info string
+        public int sessionInfoOffset;   // Session info, encoded in YAML format
+
+        // State data, output at tickRate
+        public int numVars;             // length of array pointed to by varHeaderOffset
+        public int varHeaderOffset;     // offset to irsdk_varHeader[numVars] array
+
+        public int numBuf;              // <= IRSDK_MAX_BUFS (3 for now)
+        public int bufLen;              // length in bytes for one line
+        public int curBufTickCount;     // stashed copy of the current tickCount, can read this to see if new data is available
+        public byte curBuf;             // index of the most recently written buffer (0 to IRSDK_MAX_BUFS-1)
+        public fixed byte pad1[3];      // 16 byte align
 
         // if we don't use an array here. allows us to read this structure directly from unmanaged memory
         public irsdk_varBuf varBuf1;
@@ -79,15 +92,30 @@ namespace SVappsLAB.iRacingTelemetrySDK.irSDKDefines
         #region methods
         public irsdk_varBuf GetMostRecentBuffer()
         {
+            // only the first numBuf buffers are active; the remainder are unused.
+            // use numBuf rather than assuming all IRSDK_MAX_BUFS slots are valid.
+            var activeBufs = Math.Min(numBuf, Constants.IRSDK_MAX_BUFS);
+
             var vb = varBuf1;
-            if (varBuf2.tickCount > vb.tickCount)
-                vb = varBuf2;
-            if (varBuf3.tickCount > vb.tickCount)
-                vb = varBuf3;
-            if (varBuf4.tickCount > vb.tickCount)
-                vb = varBuf4;
+            for (int i = 1; i < activeBufs; i++)
+            {
+                var candidate = GetVarBuf(i);
+                if (candidate.tickCount > vb.tickCount)
+                    vb = candidate;
+            }
             return vb;
         }
+
+        // varBuf is exposed as discrete fields (so the header can be read directly
+        // from unmanaged memory), so provide indexed access for iteration
+        irsdk_varBuf GetVarBuf(int index) => index switch
+        {
+            0 => varBuf1,
+            1 => varBuf2,
+            2 => varBuf3,
+            3 => varBuf4,
+            _ => throw new ArgumentOutOfRangeException(nameof(index)),
+        };
         #endregion
     }
 
