@@ -24,6 +24,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
         public int DriverCarIdx { get; set; } // 0
         public int DriverUserID { get; set; } // 22176
         public int PaceCarIdx { get; set; } // -1
+        public int DriverIsAdmin { get; set; } // 0/1 - the player is an admin and can have access to the admin chat commands
         public float DriverHeadPosX { get; set; } // in units of length (mm, m, etc.)
         public float DriverHeadPosY { get; set; } // in units of length (mm, m, etc.)
         public float DriverHeadPosZ { get; set; } // in units of length (mm, m, etc.)
@@ -38,6 +39,9 @@ namespace SVappsLAB.iRacingTelemetrySDK
         public int DriverCarGearNumForward { get; set; } // 6
         public int DriverCarGearNeutral { get; set; } // 1
         public int DriverCarGearReverse { get; set; } // 1
+        public string DriverGearboxType { get; set; } // Sequential/H-Pattern/Automatic/Unknown - transmission type in virtual car
+        public string DriverGearboxControlType { get; set; } // Sequential/H-Pattern/H-Pattern Direct/Automatic/Unknown - physical shifter type player is using
+        public string DriverCarShiftAid { get; set; } // Manual/Antistall/Antistall_Clutch/Antistall_Clutch_Throttle/Automatic - type of shift aids the driver has turned on
         public float DriverCarSLFirstRPM { get; set; } // 5600.000
         public float DriverCarSLShiftRPM { get; set; } // 7200.000
         public float DriverCarSLLastRPM { get; set; } // 7200.000
@@ -51,12 +55,8 @@ namespace SVappsLAB.iRacingTelemetrySDK
         public int DriverSetupPassedTech { get; set; } // 1
         public int DriverIncidentCount { get; set; } // 0
         public float DriverBrakeCurvingFactor { get; set; } // 0.001
-        public int DriverIsAdmin { get; set; } // 0/1 - the player is an admin and can have access to the admin chat commands
-        public string DriverGearboxType { get; set; } // Sequential/H-Pattern/Automatic/Unknown - transmission type in virtual car
-        public string DriverGearboxControlType { get; set; } // Sequential/H-Pattern/H-Pattern Direct/Automatic/Unknown - physical shifter type player is using
-        public string DriverCarShiftAid { get; set; } // Manual/Antistall/Antistall_Clutch/Antistall_Clutch_Throttle/Automatic - type of shift aids the driver has turned on
-        public List<Driver> Drivers { get; set; }
         public List<DriverTire> DriverTires { get; set; }
+        public List<Driver> Drivers { get; set; }
     }
 
     public class Driver

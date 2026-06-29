@@ -1,12 +1,12 @@
 /**
  * Copyright (C) 2024-2026 Scott Velez
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -120,9 +120,8 @@ namespace SVappsLAB.iRacingTelemetrySDK.DataProviders
             var offSet = header.sessionInfoOffset;
             var maxLen = header.sessionInfoLen;
 
-            var span = new Span<byte>(_dataPtr + offSet, maxLen);
-            var sessInfo = ExtractNullTerminatedString(span, maxLen);
-            return sessInfo;
+            var span = new ReadOnlySpan<byte>(_dataPtr + offSet, maxLen);
+            return SessionInfoDecoder.Decode(span);
         }
 
         public object? GetVarValue(string varName)
