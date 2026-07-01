@@ -59,6 +59,7 @@ namespace SVappsLAB.iRacingTelemetrySDK
         Serviceable = 0x00040000, // car is allowed service (not a flag)
         Furled = 0x00080000,
         Repair = 0x00100000,
+        DqScoringInvalid = 0x00200000, // car is disqualified and scoring is disabled
 
         // start lights
         StartHidden = 0x10000000,
