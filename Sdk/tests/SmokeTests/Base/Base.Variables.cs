@@ -27,36 +27,36 @@ public abstract partial class Base<T> where T : class
         bool variablesReceived = false;
         List<TelemetryVariable>? allMissingVariables = null;
 
-        var telemetryTask = Task.Run(async () =>
-        {
-            await foreach (var telemetryData in client.TelemetryData)
+        await client.Monitor(
+            new TelemetryHandlers<TelemetryData>
             {
-                variablesReceived = true;
+                OnTelemetryUpdate = _ =>
+                {
+                    // only need one sample
+                    if (variablesReceived)
+                        return Task.CompletedTask;
 
-                // get all available variable definitions from iRacing
-                var availableVariables = client.GetTelemetryVariables();
-                var availableVariableNames = availableVariables.Select(v => v.Name).ToHashSet();
+                    variablesReceived = true;
 
-                // get all TelemetryVar enum values
-                var enumVariables = Enum.GetValues<TelemetryVar>()
-                    .Select(e => e.ToString())
-                    .ToHashSet();
+                    // get all available variable definitions from iRacing
+                    var availableVariables = client.GetTelemetryVariables();
 
-                // find variables that exist in iRacing but not in our enum (keep full variable info)
-                allMissingVariables = availableVariables
-                    .Where(v => !enumVariables.Contains(v.Name))
-                    .OrderBy(v => v.Name)
-                    .ToList();
+                    // get all TelemetryVar enum values
+                    var enumVariables = Enum.GetValues<TelemetryVar>()
+                        .Select(e => e.ToString())
+                        .ToHashSet();
 
-                cts.Cancel();
-                break; // exit after first item
-            }
-        });
+                    // find variables that exist in iRacing but not in our enum (keep full variable info)
+                    allMissingVariables = availableVariables
+                        .Where(v => !enumVariables.Contains(v.Name))
+                        .OrderBy(v => v.Name)
+                        .ToList();
 
-        // start monitoring
-        var monitorTask = client.Monitor(cts.Token);
-
-        await Task.WhenAll(telemetryTask, monitorTask);
+                    cts.Cancel();
+                    return Task.CompletedTask;
+                },
+            },
+            cts.Token);
 
         Assert.True(variablesReceived, "Telemetry data was not received within the timeout period.");
 
