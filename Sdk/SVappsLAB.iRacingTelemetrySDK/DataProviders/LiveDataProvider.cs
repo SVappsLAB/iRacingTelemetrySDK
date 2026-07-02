@@ -19,7 +19,6 @@ using System.IO.MemoryMappedFiles;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using SVappsLAB.iRacingTelemetrySDK.irSDKDefines;
 
 namespace SVappsLAB.iRacingTelemetrySDK.DataProviders
 {
@@ -58,7 +57,13 @@ namespace SVappsLAB.iRacingTelemetrySDK.DataProviders
 
         internal bool ProcessNewData()
         {
-            var latestTickCount = GetLatestVarBuff().tickCount;
+            // copy new data to the access buffer,
+			// validating data is good and no write was in progress
+            if (!TryCopyLiveTelemetryDataToBuffer(out var latestTickCount))
+            {
+                _logger.LogWarning("data changed while we were reading it. skipping this sample");
+                return false;
+            }
 
             // if we missed any telemetry data, log that it happened
             if (latestTickCount > _lastTickCount)
@@ -67,7 +72,7 @@ namespace SVappsLAB.iRacingTelemetrySDK.DataProviders
                 if (_lastTickCount != 0 && tickDiff > 0)
                 {
                     _dataDropCount += tickDiff;
-                    _logger.LogWarning("dropped {count} data records. {total} total. last tick: {lastTick}, current tick: {currentTick}", tickDiff, _dataDropCount, _lastTickCount, latestTickCount);
+                    _logger.LogWarning("dropped {count} data records. a total of {total} missed so far. last tick: {lastTick}, current tick: {currentTick}", tickDiff, _dataDropCount, _lastTickCount, latestTickCount);
                 }
             }
 
@@ -78,17 +83,10 @@ namespace SVappsLAB.iRacingTelemetrySDK.DataProviders
                 _logger.LogDebug("new data is older than our last sample. lost connection?  will resync");
             }
 
-            // copy new data to the access buffer for later reading
-            CopyNewTelemetryDataToBuffer();
             // resync - update our last tick count
             _lastTickCount = latestTickCount;
 
             return true;
-        }
-
-        irsdk_varBuf GetLatestVarBuff()
-        {
-            return GetHeader().GetMostRecentBuffer();
         }
         public override ValueTask DisposeAsync()
         {

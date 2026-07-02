@@ -1,12 +1,12 @@
 /**
  * Copyright (C) 2024-2026 Scott Velez
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -90,25 +90,20 @@ namespace SVappsLAB.iRacingTelemetrySDK.irSDKDefines
         public irsdk_varBuf varBuf4;
 
         #region methods
-        public irsdk_varBuf GetMostRecentBuffer()
-        {
-            // only the first numBuf buffers are active; the remainder are unused.
-            // use numBuf rather than assuming all IRSDK_MAX_BUFS slots are valid.
-            var activeBufs = Math.Min(numBuf, Constants.IRSDK_MAX_BUFS);
+        public irsdk_varBuf GetMostRecentBuffer() => GetVarBuf(GetMostRecentBufferIndex());
 
-            var vb = varBuf1;
-            for (int i = 1; i < activeBufs; i++)
-            {
-                var candidate = GetVarBuf(i);
-                if (candidate.tickCount > vb.tickCount)
-                    vb = candidate;
-            }
-            return vb;
+        public int GetMostRecentBufferIndex()
+        {
+            // use curBuf to find the most recently written buffer
+            int index = curBuf;
+            if (index >= Math.Min(numBuf, Constants.IRSDK_MAX_BUFS))
+                index = 0;
+            return index;
         }
 
         // varBuf is exposed as discrete fields (so the header can be read directly
-        // from unmanaged memory), so provide indexed access for iteration
-        irsdk_varBuf GetVarBuf(int index) => index switch
+        // from unmanaged memory). this helper provides access
+        public irsdk_varBuf GetVarBuf(int index) => index switch
         {
             0 => varBuf1,
             1 => varBuf2,

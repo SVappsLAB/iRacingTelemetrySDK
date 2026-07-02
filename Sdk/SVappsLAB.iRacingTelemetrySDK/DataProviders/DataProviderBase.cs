@@ -197,6 +197,42 @@ namespace SVappsLAB.iRacingTelemetrySDK.DataProviders
             ros.CopyTo(_telemetryDataBuffer);
         }
 
+        // live telemetry can be overwritten by the sim while we read it. mirror the
+        // official sdk's torn-read detection: 'tickCountBegin' is updated before a
+        // write starts and 'tickCount' after it completes. if the tickCount read
+        // before the copy matches tickCountBegin after, no write was in progress
+        protected bool TryCopyLiveTelemetryDataToBuffer(out int validTickCount)
+        {
+            const int MAX_ATTEMPTS = 2;
+
+            // try a few times to get the data out
+            for (var attempt = 0; attempt < MAX_ATTEMPTS; attempt++)
+            {
+                var header = GetHeader();
+                var bufIndex = header.GetMostRecentBufferIndex();
+                var varBuf = header.GetVarBuf(bufIndex);
+
+                var curTickCount = varBuf.tickCount;
+                Thread.MemoryBarrier();
+
+                var ros = new ReadOnlySpan<byte>(_dataPtr + varBuf.bufOffset, header.bufLen);
+                ros.CopyTo(_telemetryDataBuffer);
+
+                Thread.MemoryBarrier();
+
+                // re-read from shared memory to see if a write was in progress
+                if (curTickCount == GetHeader().GetVarBuf(bufIndex).tickCountBegin)
+                {
+                    validTickCount = curTickCount;
+                    return true;
+                }
+            }
+
+            // the data changed out from under us
+            validTickCount = 0;
+            return false;
+        }
+
         VarHeaderDictionary ReadVarHeaders()
         {
             var ros = new ReadOnlySpan<irsdk_varHeader>(_dataPtr + _header.varHeaderOffset, _header.numVars);
