@@ -30,28 +30,29 @@ public abstract partial class Base<T> where T : class
         bool sessionInfoReceived = false;
         List<string>? missingProperties = null;
 
-        var rawSessionTask = Task.Run(async () =>
-        {
-            await foreach (var rawYaml in client.SessionDataYaml)
+        await client.Monitor(
+            new TelemetryHandlers<TelemetryData>
             {
-                sessionInfoReceived = true;
+                OnRawSessionInfoUpdate = rawYaml =>
+                {
+                    // only need one sample
+                    if (sessionInfoReceived)
+                        return Task.CompletedTask;
 
-                var allMissingProperties = ValidateModelAgainstYaml<TelemetrySessionInfo>(rawYaml);
+                    sessionInfoReceived = true;
 
-                // skip 'CarSetup' properties since they are dynamic and can vary widely
-                missingProperties = allMissingProperties
-                    .Where(prop => !prop.StartsWith("CarSetup"))
-                    .ToList();
+                    var allMissingProperties = ValidateModelAgainstYaml<TelemetrySessionInfo>(rawYaml);
 
-                cts.Cancel();
-                break; // exit after first item
-            }
-        });
+                    // skip 'CarSetup' properties since they are dynamic and can vary widely
+                    missingProperties = allMissingProperties
+                        .Where(prop => !prop.StartsWith("CarSetup"))
+                        .ToList();
 
-        // Start monitoring
-        var monitorTask = client.Monitor(cts.Token);
-
-        await Task.WhenAll(rawSessionTask, monitorTask);
+                    cts.Cancel();
+                    return Task.CompletedTask;
+                },
+            },
+            cts.Token);
 
         Assert.True(sessionInfoReceived, "Session info was not received within the timeout period.");
 

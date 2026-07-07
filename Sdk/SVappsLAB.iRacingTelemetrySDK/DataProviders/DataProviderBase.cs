@@ -1,12 +1,12 @@
 /**
  * Copyright (C) 2024-2026 Scott Velez
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -120,9 +120,8 @@ namespace SVappsLAB.iRacingTelemetrySDK.DataProviders
             var offSet = header.sessionInfoOffset;
             var maxLen = header.sessionInfoLen;
 
-            var span = new Span<byte>(_dataPtr + offSet, maxLen);
-            var sessInfo = ExtractNullTerminatedString(span, maxLen);
-            return sessInfo;
+            var span = new ReadOnlySpan<byte>(_dataPtr + offSet, maxLen);
+            return SessionInfoDecoder.Decode(span);
         }
 
         public object? GetVarValue(string varName)
@@ -196,6 +195,42 @@ namespace SVappsLAB.iRacingTelemetrySDK.DataProviders
             var offset = _header.GetMostRecentBuffer().bufOffset + recNum * _header.bufLen;
             var ros = new ReadOnlySpan<byte>(_dataPtr + offset, _header.bufLen);
             ros.CopyTo(_telemetryDataBuffer);
+        }
+
+        // live telemetry can be overwritten by the sim while we read it. mirror the
+        // official sdk's torn-read detection: 'tickCountBegin' is updated before a
+        // write starts and 'tickCount' after it completes. if the tickCount read
+        // before the copy matches tickCountBegin after, no write was in progress
+        protected bool TryCopyLiveTelemetryDataToBuffer(out int validTickCount)
+        {
+            const int MAX_ATTEMPTS = 2;
+
+            // try a few times to get the data out
+            for (var attempt = 0; attempt < MAX_ATTEMPTS; attempt++)
+            {
+                var header = GetHeader();
+                var bufIndex = header.GetMostRecentBufferIndex();
+                var varBuf = header.GetVarBuf(bufIndex);
+
+                var curTickCount = varBuf.tickCount;
+                Thread.MemoryBarrier();
+
+                var ros = new ReadOnlySpan<byte>(_dataPtr + varBuf.bufOffset, header.bufLen);
+                ros.CopyTo(_telemetryDataBuffer);
+
+                Thread.MemoryBarrier();
+
+                // re-read from shared memory to see if a write was in progress
+                if (curTickCount == GetHeader().GetVarBuf(bufIndex).tickCountBegin)
+                {
+                    validTickCount = curTickCount;
+                    return true;
+                }
+            }
+
+            // the data changed out from under us
+            validTickCount = 0;
+            return false;
         }
 
         VarHeaderDictionary ReadVarHeaders()

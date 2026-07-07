@@ -27,9 +27,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Diagnostics.Abstractions" Version="10.0.8" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8" />
-    <PackageReference Include="YamlDotNet" Version="17.1.0" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.Abstractions" Version="10.0.9" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.9" />
+    <PackageReference Include="YamlDotNet" Version="18.1.0" />
     <ProjectReference Include="..\SVappsLAB.iRacingTelemetrySDK.CodeGen\SVappsLAB.iRacingTelemetrySDK.CodeGen.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\SVappsLAB.iRacingTelemetrySDK.EnumsAndFlags\SVappsLAB.iRacingTelemetrySDK.EnumsAndFlags.csproj" PrivateAssets="all" />
 
@@ -47,7 +47,7 @@
     <PackageTags>iRacing iRacingSDK irsdk IBT Telemetry SDK API</PackageTags>
     <PackageReadmeFile>NUGET.md</PackageReadmeFile>
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
-    <Version>2.0.0</Version>
+    <Version>2.1.0</Version>
     <Authors>Scott Velez</Authors>
     <Company>SVappsLAB</Company>
     <Copyright>Copyright (c) 2026 SVappsLAB</Copyright>
