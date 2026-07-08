@@ -2,7 +2,7 @@
 
 This document describes the SDK's threading model, data pipeline, memory layout, buffering policy, and performance instrumentation.
 
-For installation and everyday usage, see the [README](./README.md). For direct stream access and multi-consumer patterns, see [Advanced Usage](./docs/ADVANCED.md).
+For installation and everyday usage, see the [README](../README.md). For direct stream access and multi-consumer patterns, see [Advanced Usage](./ADVANCED.md).
 
 ## Table of Contents
 
@@ -26,45 +26,32 @@ For installation and everyday usage, see the [README](./README.md). For direct s
 iRacing exposes live telemetry through shared memory at 60 Hz and persists recorded telemetry in IBT files. Both sources enter the same provider pipeline and feed independent output streams.
 
 ```mermaid
-graph TB
-    subgraph "Data Sources"
-        iRacing[iRacing Simulator<br/>60Hz Live Data]
-        IBT[IBT File<br/>Historical Data]
+flowchart LR
+    subgraph Sources
+        Live["iRacing<br/>live shared memory"]
+        IBT["IBT file"]
     end
 
-    subgraph Input ["Task1 - Input Processing"]
-        ProcessingDecoding[Processing - Decoding]
+    subgraph Task1["Task 1: Read data"]
+        Read["Read and decode"]
     end
 
-    MainTask[Telemetry Data]
-
-    subgraph SessionInfo [Task2 - Session Info]
-        SessionTask[Session Info Processing<br/>YAML Parsing]
+    subgraph Task2["Task 2: Process session info"]
+        Parse["Publish raw YAML<br/>and parse it"]
     end
 
-    subgraph "High Performance Data Streams"
-        TelemetryStream[TelemetryData]
-        SessionStream[SessionData]
-        RawStream[SessionDataYaml]
+    subgraph Streams["Application streams"]
+        Telemetry["TelemetryData"]
+        RawSession["SessionDataYaml"]
+        Session["SessionData"]
     end
 
-    iRacing --> Input
-    IBT --> Input
-
-    Input --> MainTask
-    Input --> SessionInfo
-
-    MainTask --> TelemetryStream
-    SessionTask --> SessionStream
-    SessionTask --> RawStream
-
-    classDef dataSource fill:#e1f5fe
-    classDef processingSteps fill:#f3e5f5
-    classDef stream fill:#e8f5e8
-
-    class iRacing,IBT dataSource
-    class ProcessingDecoding,SessionTask processingSteps
-    class TelemetryStream,SessionStream,RawStream stream
+    Live --> Read
+    IBT --> Read
+    Read --> Telemetry
+    Read -- "session YAML" --> Parse
+    Parse --> RawSession
+    Parse --> Session
 ```
 
 **Task1** handles source reads and telemetry decoding. **Task2** publishes raw session YAML and parses it into `SessionData`. The separation keeps YAML parsing latency out of the telemetry path.
@@ -322,7 +309,7 @@ Processing rates, latency distributions, and dropped-record counts identify whet
 
 ## Related Documentation
 
-- **[README](./README.md)** - Installation, quick start, and telemetry variables
-- **[Advanced Usage](./docs/ADVANCED.md)** - Direct stream access, multiple consumers, and cancellation behavior
-- **[Migration Guide](./docs/MIGRATION_GUIDE.md)** - Upgrading from early pre-1.0 releases
-- **[SDK usage guide for agents](./docs/ai/SDK_USAGE.md)** - Recommended usage for consumer applications
+- **[README](../README.md)** - Installation, quick start, and telemetry variables
+- **[Advanced Usage](./ADVANCED.md)** - Direct stream access, multiple consumers, and cancellation behavior
+- **[Migration Guide](./MIGRATION_GUIDE.md)** - Upgrading from early pre-1.0 releases
+- **[SDK usage guide for agents](./ai/SDK_USAGE.md)** - Recommended usage for consumer applications

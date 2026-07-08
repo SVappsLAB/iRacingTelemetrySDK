@@ -62,4 +62,58 @@ public class Live : Base<Live>
         await using var client = clientFactory(_logger);
         await BaseVerifyModelMatchesRawYaml(client, TIMEOUT_SECS);
     }
+
+    [Fact]
+    public async Task VerifyTelemetryVariableTypesMatchGetValue()
+    {
+        // GetValue() only works in Synchronous mode
+        await using var client = TelemetryClient<TelemetryData>.Create(
+            _logger,
+            ibtOptions: null,
+            clientOptions: new ClientOptions { DeliveryMode = TelemetryDeliveryMode.Synchronous });
+        await BaseVerifyTelemetryVariableTypesMatchGetValue(client, TIMEOUT_SECS);
+    }
+
+    [Fact]
+    public async Task HandlerExceptionFaultsMonitor_SynchronousMode()
+    {
+        // a synchronous-mode handler exception must fault Monitor() directly,
+        // exactly like Async mode, and must never be routed to OnError. Requires iRacing running
+        // with an active session sending telemetry (see Sdk/tests/README.md).
+        await using var client = TelemetryClient<TelemetryData>.Create(
+            _logger,
+            ibtOptions: null,
+            clientOptions: new ClientOptions { DeliveryMode = TelemetryDeliveryMode.Synchronous });
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(TIMEOUT_SECS));
+
+        var errorsReceived = new List<Exception>();
+
+        var actual = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            client.Monitor(
+                new TelemetryHandlers<TelemetryData>
+                {
+                    OnTelemetryUpdate = _ => throw new InvalidOperationException("handler failed"),
+                    OnError = e =>
+                    {
+                        errorsReceived.Add(e);
+                        return Task.CompletedTask;
+                    }
+                },
+                cts.Token));
+
+        Assert.Equal("handler failed", actual.Message);
+        Assert.Empty(errorsReceived);
+    }
+
+    [Fact]
+    public async Task SynchronousModeWithoutTelemetryHandler_Throws()
+    {
+        await using var client = TelemetryClient<TelemetryData>.Create(
+            _logger,
+            ibtOptions: null,
+            clientOptions: new ClientOptions { DeliveryMode = TelemetryDeliveryMode.Synchronous });
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => client.Monitor(CancellationToken.None));
+    }
 }

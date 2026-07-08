@@ -35,7 +35,7 @@ internal enum irsdk_StatusField
 
 internal class VarHeaderDictionary : Dictionary<string, irsdk_varHeader>
 {
-    public VarHeaderDictionary() : base(StringComparer.InvariantCultureIgnoreCase)
+    public VarHeaderDictionary() : base(StringComparer.OrdinalIgnoreCase)
     {
     }
 }
@@ -198,7 +198,15 @@ internal abstract unsafe class DataProviderBase : IAsyncDisposable
 
     public object? GetVarValue(string varName)
     {
-        if (!_varHeaders!.TryGetValue(varName, out irsdk_varHeader vh))
+        // headers/buffer are populated lazily by GetHeader() once the provider has read at least one
+        // header from the data source
+        if (_varHeaders == null || _telemetryDataBuffer == null)
+        {
+            _logger.LogDebug("Telemetry data not yet available; ignoring lookup for [{varName}]", varName);
+            return null;
+        }
+
+        if (!_varHeaders.TryGetValue(varName, out irsdk_varHeader vh))
         {
             _logger.LogDebug("Telemetry variable [{varName}] not found in data provider", varName);
             return null;
@@ -251,6 +259,20 @@ internal abstract unsafe class DataProviderBase : IAsyncDisposable
 
         return val;
     }
+
+    // maps irsdk_VarType -> CLR Type mapping
+    internal static Type GetClrType(irsdk_VarType type, int count) => type switch
+    {
+        // a single char returns the raw byte; a char buffer decodes to one string (a text field, not
+        // an array of separate strings)
+        irsdk_VarType.irsdk_char => count > 1 ? typeof(string) : typeof(byte),
+        irsdk_VarType.irsdk_bool => count > 1 ? typeof(bool[]) : typeof(bool),
+        // bitField is packed into the same int/int[] path as irsdk_int above
+        irsdk_VarType.irsdk_int or irsdk_VarType.irsdk_bitField => count > 1 ? typeof(int[]) : typeof(int),
+        irsdk_VarType.irsdk_float => count > 1 ? typeof(float[]) : typeof(float),
+        irsdk_VarType.irsdk_double => count > 1 ? typeof(double[]) : typeof(double),
+        _ => throw new NotImplementedException($"{type} not implemented")
+    };
 
     // wait for iRacing to signal there is new data
     public abstract Task<bool> WaitForDataReady(TimeSpan timeSpan, CancellationToken cancellationToken = default);

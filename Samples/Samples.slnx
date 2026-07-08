@@ -7,7 +7,8 @@
   </Folder>
   <Project Path="DumpVariables_DumpSessionInfo/DumpVariables_DumpSessionInfo.csproj" />
   <Project Path="LocationAndWarnings/LocationAndWarnings.csproj" />
-  <Project Path="MinimalExample/MinimalExample.csproj" />
+  <Project Path="MinimalExampleAsync/MinimalExampleAsync.csproj" />
+  <Project Path="MinimalExampleSync/MinimalExampleSync.csproj" />
   <Project Path="SimControl/SimControl.csproj" />
   <Project Path="SpeedRPMGear/SpeedRPMGear.csproj" />
 </Solution>

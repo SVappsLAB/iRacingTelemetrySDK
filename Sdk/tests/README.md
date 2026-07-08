@@ -5,7 +5,7 @@
 Unit tests cover individual classes and functions without requiring iRacing or live telemetry.
 
 ```powershell
-dotnet test .\Sdk\tests\UnitTests\UnitTests.csproj
+dotnet test --project .\Sdk\tests\UnitTests\UnitTests.csproj
 ```
 
 ## Offline IBT Smoke Tests
@@ -38,7 +38,19 @@ dotnet run --project .\Sdk\tests\UnitTests\UnitTests.csproj -- --filter-trait Ca
 The full solution test run may include tests that require live iRacing data or local manual-test setup.
 
 ```powershell
-dotnet test .\Sdk\SVappsLAB.iRacingTelemetrySDK.slnx
+dotnet test --solution .\Sdk\SVappsLAB.iRacingTelemetrySDK.slnx
 ```
 
-Do not rely on `dotnet test --filter unit`, `--filter ibt`, or `--filter live` with the current Microsoft.Testing.Platform setup; those VSTest-style filters are ignored. Use `--filter-trait Category=...` with `dotnet run --project` for filtered MTP test runs.
+This repo pins `test.runner` to `Microsoft.Testing.Platform` in `global.json` (required on the .NET 10 SDK,
+where `dotnet test`'s legacy VSTest bridge no longer supports MTP-based projects like these xUnit v3 ones).
+Two consequences:
+
+- `dotnet test` requires `--project <csproj>` or `--solution <slnx>` - a bare positional path is rejected.
+- `--filter unit` / `--filter ibt` / `--filter live` (VSTest-style filters) are not supported at all; use
+  `--filter-trait Category=...` instead (append it after `--`, e.g. `dotnet test --project X.csproj --
+  --filter-trait Category=unit`).
+
+For `SmokeTests` specifically, prefer `dotnet run --project` over `dotnet test` as shown above:
+`SmokeTests`' `Properties/launchSettings.json` supplies a default `--filter-class` argument that `dotnet
+test` combines with (rather than overrides with) any `--filter-trait` you pass on the command line, which
+silently produces "zero tests ran" instead of an error. `dotnet run --project` does not have this problem.

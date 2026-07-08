@@ -78,6 +78,7 @@ public class Program
 10. Live telemetry requires Windows and a running iRacing session. If unsure or running on Linux/macOS, default to IBT mode for portability.
 11. Target .NET 8.0 or newer.
 12. `OnError` is for SDK processing errors only. Exceptions thrown inside your handlers fault `Monitor(...)` directly; they are not sent to `OnError`. Wrap recoverable per-item work in `try/catch` inside the handler.
+13. If the variable set is not known at compile time, use `TelemetryClient<DynamicTelemetryData>` and `GetValue(string)` instead of `RequiredTelemetryVars` + `TelemetryData`. `GetValue` requires `ClientOptions { DeliveryMode = TelemetryDeliveryMode.Synchronous }` - it throws `InvalidOperationException` under the default `Async` mode.
 
 ## Error Handling
 
@@ -126,6 +127,36 @@ sim.Pit.AddFuel(30);                                              // only while 
 sim.Camera.SwitchToPosition(CameraFocus.AtLeader, 1, 1);
 sim.Replay.Search(ReplaySearchMode.NextIncident);                 // only while out of the car
 ```
+
+## Dynamic Variable Lookup
+
+Use this only when the variable set is not known at compile time (e.g. a user-configurable dashboard) or when a `RequiredTelemetryVars`-annotated struct is impractical (e.g. some game engine build pipelines). Otherwise use the Default Pattern above.
+
+```csharp
+// no RequiredTelemetryVars needed - use the DynamicTelemetryData placeholder
+// GetValue requires Synchronous delivery mode - see below
+var clientOptions = new ClientOptions { DeliveryMode = TelemetryDeliveryMode.Synchronous };
+await using var client = TelemetryClient<DynamicTelemetryData>.Create(logger, ibtOptions: null, clientOptions);
+
+var handlers = new TelemetryHandlers<DynamicTelemetryData>
+{
+    OnTelemetryUpdate = _ =>
+    {
+        if (client.GetValue("Speed") is float speed)
+        {
+            Console.WriteLine($"Speed: {speed}");
+        }
+        return Task.CompletedTask;
+    }
+};
+
+await client.Monitor(handlers, cts.Token);
+```
+
+- `GetValue(varName)` matches names case-insensitively and works for any variable reported by `GetTelemetryVariables()`, not just ones declared on `T`.
+- Returns a boxed scalar (e.g. `float`) or array (e.g. `float[]`), or `null` if the variable is unknown or telemetry data isn't yet available.
+- Prefer `T` for variables known at compile time; it's allocation-free.
+- The SDK only works in one delivery mode at a time - `GetValue` is only usable when the client is created with `new ClientOptions { DeliveryMode = TelemetryDeliveryMode.Synchronous }`; calling it under the default `TelemetryDeliveryMode.Async` throws `InvalidOperationException`, since production and consumption run on independent tasks there and there'd be no way to guarantee `GetValue` matches the `T` sample delivered to the handler currently running. In `Synchronous` mode, each sample is awaited directly by the handler before the next record is read, so `GetValue` always matches the delivered sample - at the cost of throughput (see `SDK_REFERENCE.md`).
 
 ## When To Use Direct Streams
 

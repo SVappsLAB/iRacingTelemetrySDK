@@ -28,6 +28,9 @@ public class IBT : Base<IBT>
 {
     const int TIMEOUT_SECS = 5;
 
+    // resolve relative to the test assembly's own location
+    private static readonly string IbtDataDirectory = Path.Combine(AppContext.BaseDirectory, "data", "ibt");
+
     public IBT(ITestOutputHelper output) : base(output)
     {
     }
@@ -46,8 +49,7 @@ public class IBT : Base<IBT>
         {
             var testData = new TheoryData<string, Func<ILogger, ITelemetryClient<TelemetryData>>>();
 
-            var ibtDirectory = @"data\ibt";
-            var ibtFiles = Directory.GetFiles(ibtDirectory, "*.ibt");
+            var ibtFiles = Directory.GetFiles(IbtDataDirectory, "*.ibt");
 
             foreach (var ibtFile in ibtFiles)
             {
@@ -67,6 +69,89 @@ public class IBT : Base<IBT>
     public override async Task BasicMonitoring(string _mode, Func<ILogger, ITelemetryClient<TelemetryData>> clientFactory)
     {
         await base.BasicMonitoring(_mode, clientFactory);
+    }
+
+    [Fact]
+    public async Task GetValueBeforeMonitorStarted_ReturnsNull()
+    {
+        // the provider hasn't read a header/var-buffer yet at this point (that only
+        // happens once Monitor() starts pumping data), so GetValue() must return null instead of
+        // throwing NullReferenceException. Requires Synchronous mode - GetValue() throws outright in
+        // the default Async mode (see GetValueInAsyncMode_Throws).
+        var ibtFile = Directory.GetFiles(IbtDataDirectory, "*.ibt").First();
+
+        await using var client = TelemetryClient<TelemetryData>.Create(
+            _logger,
+            new IBTOptions(ibtFile),
+            new ClientOptions { DeliveryMode = TelemetryDeliveryMode.Synchronous });
+
+        Assert.Null(client.GetValue("RPM"));
+    }
+
+    [Fact]
+    public async Task GetValueInAsyncMode_Throws()
+    {
+        // the SDK only works in one delivery mode at a time - GetValue() is unusable in the default
+        // Async mode regardless of whether Monitor() has started, since production and consumption
+        // run on independent tasks and there is no way to guarantee it reflects the delivered sample.
+        var ibtFile = Directory.GetFiles(IbtDataDirectory, "*.ibt").First();
+
+        await using var client = TelemetryClient<TelemetryData>.Create(_logger, new IBTOptions(ibtFile));
+
+        Assert.Throws<InvalidOperationException>(() => client.GetValue("RPM"));
+    }
+
+    [Fact]
+    public async Task GetValueAfterDispose_Throws()
+    {
+        var ibtFile = Directory.GetFiles(IbtDataDirectory, "*.ibt").First();
+
+        var client = TelemetryClient<TelemetryData>.Create(_logger, new IBTOptions(ibtFile));
+        await client.DisposeAsync();
+
+        Assert.Throws<ObjectDisposedException>(() => client.GetValue("RPM"));
+    }
+
+    [Fact]
+    public async Task GetTelemetryVariablesBeforeMonitorStarted_DoesNotPermanentlyCacheEmpty()
+    {
+        // calling GetTelemetryVariables() before the provider has read headers must
+        // return an empty list without caching it - once Monitor() starts and headers become
+        // available, later calls must return the real list, not the stale empty one.
+        var ibtFile = Directory.GetFiles(IbtDataDirectory, "*.ibt").First();
+
+        await using var client = TelemetryClient<TelemetryData>.Create(_logger, new IBTOptions(ibtFile));
+
+        Assert.Empty(client.GetTelemetryVariables());
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(TIMEOUT_SECS));
+        var sampleReceived = false;
+
+        await client.Monitor(
+            new TelemetryHandlers<TelemetryData>
+            {
+                OnTelemetryUpdate = _ =>
+                {
+                    sampleReceived = true;
+                    cts.Cancel();
+                    return Task.CompletedTask;
+                }
+            },
+            cts.Token);
+
+        Assert.True(sampleReceived);
+        Assert.NotEmpty(client.GetTelemetryVariables());
+    }
+
+    [Fact]
+    public async Task GetTelemetryVariablesAfterDispose_Throws()
+    {
+        var ibtFile = Directory.GetFiles(IbtDataDirectory, "*.ibt").First();
+
+        var client = TelemetryClient<TelemetryData>.Create(_logger, new IBTOptions(ibtFile));
+        await client.DisposeAsync();
+
+        Assert.Throws<ObjectDisposedException>(() => client.GetTelemetryVariables());
     }
 
     [Fact]
@@ -97,6 +182,67 @@ public class IBT : Base<IBT>
 
         await using var client = clientFactory(_logger);
         await BaseVerifyAllVariablesCovered(client, TIMEOUT_SECS);
+    }
+
+    [Theory]
+    [MemberData(nameof(SyncTestModes))]
+    public async Task VerifyDynamicLookupShape(string mode, Func<ILogger, ITelemetryClient<TelemetryData>> clientFactory)
+    {
+        _ = mode;   // used only to name the test cases in the test runner display
+
+        // GetValue() only works in Synchronous mode - see GetValueInAsyncMode_Throws.
+        await using var client = clientFactory(_logger);
+        await BaseVerifyDynamicLookupShape(client, TIMEOUT_SECS);
+    }
+
+    [Theory]
+    [MemberData(nameof(SyncTestModes))]
+    public async Task VerifyTelemetryVariableTypesMatchGetValue(string mode, Func<ILogger, ITelemetryClient<TelemetryData>> clientFactory)
+    {
+        _ = mode;   // used only to name the test cases in the test runner display
+
+        // GetValue() only works in Synchronous mode - see GetValueInAsyncMode_Throws.
+        await using var client = clientFactory(_logger);
+        await BaseVerifyTelemetryVariableTypesMatchGetValue(client, TIMEOUT_SECS);
+    }
+
+    /// <summary>
+    /// same file set as <see cref="TestModes"/>, but configured for
+    /// <see cref="TelemetryDeliveryMode.Synchronous"/> delivery, which guarantees GetValue() matches the
+    /// sample delivered to the handler even under unthrottled (as-fast-as-possible) IBT playback.
+    /// </summary>
+    public static TheoryData<string, Func<ILogger, ITelemetryClient<TelemetryData>>> SyncTestModes
+    {
+        get
+        {
+            var testData = new TheoryData<string, Func<ILogger, ITelemetryClient<TelemetryData>>>();
+
+            var ibtFiles = Directory.GetFiles(IbtDataDirectory, "*.ibt");
+
+            foreach (var ibtFile in ibtFiles)
+            {
+                var fileName = Path.GetFileNameWithoutExtension(ibtFile);
+                testData.Add(
+                    $"IBT (sync) - {fileName}",
+                    logger => TelemetryClient<TelemetryData>.Create(
+                        logger,
+                        new IBTOptions(ibtFile),
+                        new ClientOptions { DeliveryMode = TelemetryDeliveryMode.Synchronous })
+                );
+            }
+
+            return testData;
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(SyncTestModes))]
+    public async Task VerifyDynamicLookupMatchesTypedValues_SynchronousMode(string mode, Func<ILogger, ITelemetryClient<TelemetryData>> clientFactory)
+    {
+        _ = mode;   // used only to name the test cases in the test runner display
+
+        await using var client = clientFactory(_logger);
+        await BaseVerifyDynamicLookupMatchesTypedValues(client, TIMEOUT_SECS);
     }
 
     [Theory]
@@ -146,10 +292,75 @@ public class IBT : Base<IBT>
     }
 
     [Fact]
+    public async Task HandlerExceptionFaultsMonitor_SynchronousMode()
+    {
+        // a synchronous-mode handler exception must fault Monitor() directly,
+        // exactly like Async mode, and must never be routed to OnError.
+        var ibtFile = Directory.GetFiles(IbtDataDirectory, "*.ibt").First();
+
+        await using var client = TelemetryClient<TelemetryData>.Create(
+            _logger,
+            new IBTOptions(ibtFile),
+            new ClientOptions { DeliveryMode = TelemetryDeliveryMode.Synchronous });
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(TIMEOUT_SECS));
+
+        var errorsReceived = new List<Exception>();
+
+        var actual = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            client.Monitor(
+                new TelemetryHandlers<TelemetryData>
+                {
+                    OnTelemetryUpdate = _ => throw new InvalidOperationException("handler failed"),
+                    OnError = e =>
+                    {
+                        errorsReceived.Add(e);
+                        return Task.CompletedTask;
+                    }
+                },
+                cts.Token));
+
+        Assert.Equal("handler failed", actual.Message);
+        Assert.Empty(errorsReceived);
+    }
+
+    [Fact]
+    public async Task SynchronousModeWithoutTelemetryHandler_MonitorNoHandlersOverload_Throws()
+    {
+        var ibtFile = Directory.GetFiles(IbtDataDirectory, "*.ibt").First();
+
+        await using var client = TelemetryClient<TelemetryData>.Create(
+            _logger,
+            new IBTOptions(ibtFile),
+            new ClientOptions { DeliveryMode = TelemetryDeliveryMode.Synchronous });
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => client.Monitor(CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task SynchronousModeWithoutTelemetryHandler_MonitorHandlersOverload_Throws()
+    {
+        var ibtFile = Directory.GetFiles(IbtDataDirectory, "*.ibt").First();
+
+        await using var client = TelemetryClient<TelemetryData>.Create(
+            _logger,
+            new IBTOptions(ibtFile),
+            new ClientOptions { DeliveryMode = TelemetryDeliveryMode.Synchronous });
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            client.Monitor(
+                new TelemetryHandlers<TelemetryData>
+                {
+                    OnSessionInfoUpdate = _ => Task.CompletedTask
+                },
+                CancellationToken.None));
+    }
+
+    [Fact]
     public async Task MultipleHandlers_OneThrows_FaultsMonitorPromptly()
     {
-        // regression test: with multiple handlers registered, a throwing handler must fault Monitor promptly.
-        var ibtFile = Directory.GetFiles(@"data\ibt", "raygr22*").First();
+        // with multiple handlers registered, a throwing handler must fault Monitor promptly.
+        var ibtFile = Directory.GetFiles(IbtDataDirectory, "raygr22*").First();
 
         await using var client = TelemetryClient<TelemetryData>.Create(
             _logger,
@@ -179,7 +390,7 @@ public class IBT : Base<IBT>
     [Fact]
     public async Task HungHandlerFaultsMonitorAfterShutdownTimeout()
     {
-        var ibtFile = Directory.GetFiles(@"data\ibt", "*.ibt").First();
+        var ibtFile = Directory.GetFiles(IbtDataDirectory, "*.ibt").First();
 
         await using var client = TelemetryClient<TelemetryData>.Create(
             _logger,
@@ -205,7 +416,7 @@ public class IBT : Base<IBT>
     [Fact]
     public async Task HandlerMonitorRejectsCompletedClientBeforeStartingHandlers()
     {
-        var ibtFile = Directory.GetFiles(@"data\ibt", "*.ibt").First();
+        var ibtFile = Directory.GetFiles(IbtDataDirectory, "*.ibt").First();
 
         await using var client = TelemetryClient<TelemetryData>.Create(
             _logger,

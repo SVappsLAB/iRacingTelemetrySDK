@@ -121,7 +121,7 @@ If a callback registered via `Monitor(handlers, ct)` does not return within 5 se
 - [ ] Drop `.WithCancellation(ct)` from normal `await foreach` loops on the client's streams.
 - [ ] Audit handlers for callbacks that may take longer than 5 seconds.
 
-See `Samples/MinimalExample/` for a complete v2.0 reference.
+See `Samples/MinimalExampleAsync/` for a complete v2.0 reference.
 
 ---
 

@@ -1,13 +1,14 @@
-# iRacing Telemetry SDK for C# .NET
+# iRacing SDK for C# .NET
 
-High-performance .NET SDK for accessing **live telemetry data** from iRacing simulator and **IBT file playback**. Features compile-time code generation for strongly-typed telemetry access with lock-free performance optimizations.
+High-performance .NET SDK for accessing **live telemetry data** from iRacing simulator, **IBT file playback**, and **simulator control**. Features compile-time code generation for strongly-typed telemetry access with lock-free performance optimizations, plus a command API for driving cameras, replay, pit service, and more.
 
 ## Why Use This SDK?
 
 - **Type Safety**: Enum-based telemetry variables with IntelliSense/Copilot support and compile-time validation
 - **High Performance**: Processes 600,000+ telemetry records/second with lock-free data streaming architecture
 - **Background Processing**: Dedicated threads for telemetry collection and processing - your app's processing speed never blocks the streaming telemetry data
-- **Modern Async API**: Async data streams with async/await patterns and automatic backpressure handling
+- **Modern Async API**: Async data streams with async/await patterns, bounded buffering, and automatic overload handling
+- **Dynamic Variable Lookup**: Look up any telemetry variable by name at runtime with `GetValue(string)` - no compile-time struct required
 - **Live Telemetry**: Real-time access to speed, RPM, tire data, and 200+ variables during iRacing sessions
 - **IBT File Support**: Cross-platform playback of historical telemetry using the same strongly-typed API
 - **Robust Buffering**: 60-sample ring buffer (1 second at 60Hz) ensures reliable data delivery even when your app can't keep pace
@@ -18,11 +19,11 @@ High-performance .NET SDK for accessing **live telemetry data** from iRacing sim
 Most .NET iRacing libraries are thin wrappers over the simulator's shared-memory layout — variables looked up by string name at runtime, data delivered through events on the caller's thread. This SDK treats telemetry as a **typed, high-throughput data stream** instead:
 
 - **Compile-time generated structs** instead of runtime string/dictionary lookups — typos are build errors, and only the variables you declare are ever decoded
-- **Async data streams with bounded backpressure** instead of events on the caller's thread — your processing speed never stalls data collection
-- **The same strongly-typed API for live and IBT data**, rather than separate code paths
-- **Built-in metrics** (`System.Diagnostics.Metrics`) so you can see processing rates and dropped records in production
+- **Non-blocking async data streams with bounded backpressure** instead of callbacks that block further frame processing until your handler returns — your processing speed never stalls data collection
+- **The same strongly-typed API for live and IBT playback** — most alternatives are live-only, or treat file playback as a separate path
+- **Built-in `System.Diagnostics.Metrics`** integration (rates, dropped records, histograms), so telemetry health plugs directly into your existing observability stack
 
-Full comparison and design rationale: [Architecture and Design](https://github.com/SVappsLAB/iRacingTelemetrySDK/blob/main/ARCHITECTURE.md)
+Full comparison and design rationale: [Architecture and Design](https://github.com/SVappsLAB/iRacingTelemetrySDK/blob/main/docs/ARCHITECTURE.md)
 
 ## Architecture Benefits
 
@@ -153,7 +154,7 @@ See the [SimControl sample](https://github.com/SVappsLAB/iRacingTelemetrySDK/tre
 
 - **[Getting Started Guide](https://github.com/SVappsLAB/iRacingTelemetrySDK#readme)** - Setup and basic usage
 - **[Sample Projects](https://github.com/SVappsLAB/iRacingTelemetrySDK/tree/main/Samples)** - Basic monitoring, data export, track analysis
-- **[Architecture and Design](https://github.com/SVappsLAB/iRacingTelemetrySDK/blob/main/ARCHITECTURE.md)** - Threading model, buffering, performance, and metrics
+- **[Architecture and Design](https://github.com/SVappsLAB/iRacingTelemetrySDK/blob/main/docs/ARCHITECTURE.md)** - Threading model, buffering, performance, and metrics
 - **[Advanced Usage](https://github.com/SVappsLAB/iRacingTelemetrySDK/blob/main/docs/ADVANCED.md)** - Direct stream access, multiple consumers, and cancellation behavior
 - **[Migration Guide](https://github.com/SVappsLAB/iRacingTelemetrySDK/blob/main/docs/MIGRATION_GUIDE.md)** - Upgrading from previous versions
 - **[GitHub Repository](https://github.com/SVappsLAB/iRacingTelemetrySDK)** - Source code and releases

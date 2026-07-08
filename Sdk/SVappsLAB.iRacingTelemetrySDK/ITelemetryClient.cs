@@ -14,10 +14,6 @@
  * limitations under the License.
 **/
 
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 using SVappsLAB.iRacingTelemetrySDK.SimControl;
 
 namespace SVappsLAB.iRacingTelemetrySDK;
@@ -161,6 +157,12 @@ public interface ITelemetryClient<T> : IAsyncDisposable where T : struct
     /// and may cause undefined behavior. For callback-based consumption, use the
     /// <see cref="Monitor(TelemetryHandlers{T}, CancellationToken)"/> overload.
     /// </para>
+    /// <para>
+    /// <strong>Not available in Synchronous delivery mode:</strong> when the client is created with
+    /// <see cref="ClientOptions.DeliveryMode"/> set to <see cref="TelemetryDeliveryMode.Synchronous"/>, samples
+    /// are delivered directly to <see cref="TelemetryHandlers{T}.OnTelemetryUpdate"/> instead of being queued on
+    /// this stream. Accessing this property in that mode throws <see cref="InvalidOperationException"/>.
+    /// </para>
     /// </remarks>
     /// <example>
     /// <code>
@@ -178,18 +180,61 @@ public interface ITelemetryClient<T> : IAsyncDisposable where T : struct
     /// <returns>
     /// A read-only list of telemetry variables. Returns an empty list if called before
     /// the data provider has been initialized (typically during or after the first
-    /// Monitor() call in live mode, or immediately after construction for IBT mode).
+    /// Monitor() call, for both live and IBT mode).
     /// </returns>
     /// <remarks>
     /// <para><strong>Initialization Timing:</strong> In live mode, variable headers become
     /// available only after iRacing is running and the first data update occurs. In IBT mode,
-    /// they're available immediately after construction.</para>
+    /// they become available once <c>Monitor()</c> opens the file</para>
     /// <para><strong>Thread Safety:</strong> This method is thread-safe and can be called
     /// concurrently with Monitor(), though results may vary depending on initialization state.</para>
     /// </remarks>
     /// <exception cref="ObjectDisposedException">Thrown if the client has been disposed.</exception>
     IReadOnlyList<TelemetryVariable> GetTelemetryVariables();
 
+    /// <summary>
+    /// Gets the current value of a telemetry variable by name.
+    /// </summary>
+    /// <param name="varName">
+    /// The iRacing telemetry variable name (e.g. "Speed", "RPM", "CarIdxTrackSurface"). Names are matched
+    /// case-insensitively and are not limited to the variables declared on <typeparamref name="T"/> - any
+    /// variable reported by <see cref="GetTelemetryVariables"/> can be looked up this way.
+    /// </param>
+    /// <returns>
+    /// The current value, boxed as a scalar (e.g. a <see cref="float"/>) or an array (e.g. <c>float[]</c>)
+    /// depending on the variable, or <see langword="null"/> if <paramref name="varName"/> is not a known
+    /// variable or telemetry data is not yet available.
+    /// </returns>
+    /// <remarks>
+    /// <para>
+    /// Use this for scenarios where the set of variables is only known at runtime - for example, a dashboard
+    /// that lets end users pick which telemetry values to display, or an integration (such as a game engine)
+    /// that prefers a dynamic, string-keyed lookup over a compile-time generated struct. See
+    /// <see cref="DynamicTelemetryData"/> for a <typeparamref name="T"/> placeholder that avoids the need for
+    /// a <c>RequiredTelemetryVars</c>-annotated struct entirely.
+    /// </para>
+    /// <para>
+    /// Prefer the strongly-typed <typeparamref name="T"/> for variables known at compile time - it is
+    /// allocation-free.
+    /// </para>
+    /// <para>
+    /// <strong>Only usable in <see cref="TelemetryDeliveryMode.Synchronous"/> mode.</strong> The SDK operates
+    /// in exactly one of two modes, chosen when the client is created via <see cref="ClientOptions.DeliveryMode"/>,
+    /// and does not allow mixing them: in the default <see cref="TelemetryDeliveryMode.Async"/> mode, production
+    /// and consumption run on independent tasks, so there would be no way to guarantee this method reflects the
+    /// same record as the <typeparamref name="T"/> sample passed to
+    /// <see cref="TelemetryHandlers{T}.OnTelemetryUpdate"/> - calling it in that mode throws
+    /// <see cref="InvalidOperationException"/>. In <see cref="TelemetryDeliveryMode.Synchronous"/> mode, this
+    /// method is guaranteed to reflect exactly the sample passed to the currently-running handler, because the
+    /// next record isn't read until the handler returns.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ObjectDisposedException">Thrown if the client has been disposed.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown if the client was created with <see cref="ClientOptions.DeliveryMode"/> set to
+    /// <see cref="TelemetryDeliveryMode.Async"/>.
+    /// </exception>
+    object? GetValue(string varName);
 
     /// <summary>
     /// Monitors the telemetry data and writes data to streams when new data is available.
@@ -208,7 +253,14 @@ public interface ITelemetryClient<T> : IAsyncDisposable where T : struct
     /// <para><strong>Concurrent Calls:</strong> Calling Monitor() while already running will throw
     /// InvalidOperationException. Ensure the previous Monitor() call has completed before starting
     /// a new client instance.</para>
+    /// <para><strong>Synchronous delivery mode:</strong> this overload supplies no
+    /// <see cref="TelemetryHandlers{T}.OnTelemetryUpdate"/> handler, so it is incompatible with
+    /// <see cref="TelemetryDeliveryMode.Synchronous"/> - use
+    /// <see cref="Monitor(TelemetryHandlers{T}, CancellationToken)"/> instead.</para>
     /// </remarks>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown immediately if the client was created with <see cref="TelemetryDeliveryMode.Synchronous"/>.
+    /// </exception>
     Task<int> Monitor(CancellationToken ct);
 
     /// <summary>
@@ -227,14 +279,24 @@ public interface ITelemetryClient<T> : IAsyncDisposable where T : struct
     /// stops monitoring and returns normally after handlers finish.
     /// </para>
     /// <para>
-    /// Handler exceptions fault this method directly. SDK processing errors are delivered to
-    /// <see cref="TelemetryHandlers{T}.OnError"/> when that handler is provided.
+    /// Handler exceptions fault this method directly - this holds for both
+    /// <see cref="TelemetryDeliveryMode.Async"/> and <see cref="TelemetryDeliveryMode.Synchronous"/>. SDK
+    /// processing errors are delivered to <see cref="TelemetryHandlers{T}.OnError"/> when that handler is
+    /// provided; handler exceptions are never routed there.
     /// </para>
     /// <para>
     /// Handlers are awaited sequentially per stream. Keep handlers fast, especially telemetry
     /// handlers that may run at 60Hz.
     /// </para>
+    /// <para>
+    /// <strong>Synchronous delivery mode:</strong> requires <see cref="TelemetryHandlers{T}.OnTelemetryUpdate"/>
+    /// to be set; otherwise telemetry samples would be silently discarded.
+    /// </para>
     /// </remarks>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown immediately if the client was created with <see cref="TelemetryDeliveryMode.Synchronous"/> and
+    /// <paramref name="handlers"/> does not set <see cref="TelemetryHandlers{T}.OnTelemetryUpdate"/>.
+    /// </exception>
     Task<int> Monitor(TelemetryHandlers<T> handlers, CancellationToken ct);
 
     /// <summary>
@@ -252,11 +314,23 @@ public interface ITelemetryClient<T> : IAsyncDisposable where T : struct
     /// <summary>
     /// Pauses stream data writing. Processing continues, but stream writes are suppressed.
     /// </summary>
+    /// <remarks>
+    /// <para><strong>Thread Safety:</strong> This method is thread-safe and can be called from any thread.</para>
+    /// <para><strong>Idempotency:</strong> Safe to call multiple times. Calling Pause() when already paused has no effect.</para>
+    /// <para><strong>Eventual Consistency:</strong> Changes are not immediate. A few telemetry samples may be written
+    /// to streams before the pause takes effect</para>
+    /// </remarks>
     void Pause();
 
     /// <summary>
     /// Resumes stream data writing.
     /// </summary>
+    /// <remarks>
+    /// <para><strong>Thread Safety:</strong> This method is thread-safe and can be called from any thread.</para>
+    /// <para><strong>Idempotency:</strong> Safe to call multiple times. Calling Resume() when not paused has no effect.</para>
+    /// <para><strong>Eventual Consistency:</strong> Changes are not immediate. A few telemetry samples may be suppressed
+    /// before the resume takes effect.</para>
+    /// </remarks>
     void Resume();
 
     /// <summary>

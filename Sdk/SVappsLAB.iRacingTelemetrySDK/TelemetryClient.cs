@@ -14,22 +14,17 @@
  * limitations under the License.
 **/
 
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Diagnostics.Metrics;
-using System.IO;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using System.Threading;
-using System.Threading.Channels;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using SVappsLAB.iRacingTelemetrySDK.DataProviders;
-using SVappsLAB.iRacingTelemetrySDK.irSDKDefines;
 using SVappsLAB.iRacingTelemetrySDK.Metrics;
 using SVappsLAB.iRacingTelemetrySDK.SimControl;
 using SVappsLAB.iRacingTelemetrySDK.YamlParsing;
+using System.Diagnostics;
+using System.Diagnostics.Metrics;
+using System.Runtime.CompilerServices;
+using System.Runtime.ExceptionServices;
+using System.Runtime.InteropServices;
+using System.Threading.Channels;
 
 namespace SVappsLAB.iRacingTelemetrySDK;
 
@@ -55,6 +50,35 @@ public record class TelemetryVariable
     // unit.  something like "kg/m^2"
     public string Units { get; init; } = default!;
 }
+
+/// <summary>
+/// Placeholder telemetry data type for use with <see cref="TelemetryClient{T}"/> when you only need
+/// dynamic, string-based variable lookup (<see cref="TelemetryClient{T}.GetValue(string)"/>)
+/// and don't want to declare a <c>RequiredTelemetryVars</c>-annotated struct.
+/// </summary>
+/// <remarks>
+/// Useful when embedding the SDK somewhere the Roslyn source generator is inconvenient to use (e.g. some
+/// game engine build pipelines), or when building a fully dynamic dashboard where the set of telemetry
+/// values is chosen by the end user at runtime rather than fixed at compile time.
+/// <code>
+/// await using var client = TelemetryClient&lt;DynamicTelemetryData&gt;.Create(logger);
+/// await client.Monitor(new TelemetryHandlers&lt;DynamicTelemetryData&gt;
+/// {
+///     OnTelemetryUpdate = _ =>
+///     {
+///         if (client.GetValue("Speed") is float speed)
+///         {
+///             // use speed
+///         }
+///         return Task.CompletedTask;
+///     }
+/// }, cancellationToken);
+/// </code>
+/// </remarks>
+public readonly struct DynamicTelemetryData
+{
+}
+
 /**
  * Options for IBT file processing.
  *
@@ -83,10 +107,43 @@ public record class IBTOptions
 }
 
 /// <summary>
+/// Controls how telemetry samples are handed off from the background processing loop to
+/// <see cref="TelemetryHandlers{T}.OnTelemetryUpdate"/>, and what that means for
+/// <see cref="TelemetryClient{T}.GetValue(string)"/>.
+/// </summary>
+public enum TelemetryDeliveryMode
+{
+    /// <summary>
+    /// This is the highly preferred default, high-throughput mode.
+    /// </summary>
+    Async,
+
+    /// <summary>
+    /// This is the slower, blocking, optional sychronous mode. 
+    /// Only supported via
+    /// <see cref="TelemetryClient{T}.Monitor(TelemetryHandlers{T}, CancellationToken)"/> with
+    /// <see cref="TelemetryHandlers{T}.OnTelemetryUpdate"/> set - both <c>Monitor(CancellationToken)</c>
+    /// and a handlers object without <c>OnTelemetryUpdate</c> throw <see cref="InvalidOperationException"/>
+    /// immediately, since telemetry would otherwise be silently discarded. The
+    /// <see cref="TelemetryClient{T}.TelemetryData"/> async-enumerable stream is not populated in this mode.
+    /// </summary>
+    Synchronous
+}
+
+/// <summary>
 /// Configuration options that control various aspects of telemetry processing.
 /// </summary>
 public class ClientOptions
 {
+    /// <summary>
+    /// Controls how telemetry samples are delivered to handlers, and whether
+    /// <see cref="TelemetryClient{T}.GetValue(string)"/> is usable at all. Defaults to
+    /// <see cref="TelemetryDeliveryMode.Async"/>, in which <c>GetValue</c> throws
+    /// <see cref="InvalidOperationException"/> - use <see cref="TelemetryDeliveryMode.Synchronous"/> if you
+    /// need <c>GetValue</c>.
+    /// </summary>
+    public TelemetryDeliveryMode DeliveryMode { get; init; } = TelemetryDeliveryMode.Async;
+
     /// <summary>
     /// Optional factory for creating metrics to monitor telemetry processing performance.
     /// Tracks processing duration and record counts.
@@ -136,7 +193,16 @@ public class TelemetryClient<T> : ITelemetryClient<T>, IAsyncDisposable where T 
 
     // telemetry variables caching
     private IReadOnlyList<TelemetryVariable>? _cachedTelemetryVariables;
+    private VarHeaderDictionary? _cachedTelemetryVariablesSourceHeaders;
     private readonly object _telemetryVariablesLock = new object();
+
+    private readonly TelemetryDeliveryMode _deliveryMode;
+    // set only when _deliveryMode == Synchronous; invoked inline by the producer loop
+    private Func<T, Task>? _syncTelemetryHandler;
+
+    // internal usage only. thrown when _syncTelemetryHandler itself throws. used to distguish
+    // between handler fault and provider error
+    private sealed class SyncHandlerFaultException(Exception innerException) : Exception(innerException.Message, innerException);
 
     /// <inheritdoc />
     public IAsyncEnumerable<ConnectState> ConnectStates => GetConnectStatesEnumerable();
@@ -151,7 +217,12 @@ public class TelemetryClient<T> : ITelemetryClient<T>, IAsyncDisposable where T 
     public IAsyncEnumerable<TelemetrySessionInfo> SessionData => GetSessionDataEnumerable();
 
     /// <inheritdoc />
-    public IAsyncEnumerable<T> TelemetryData => GetTelemetryDataEnumerable();
+    public IAsyncEnumerable<T> TelemetryData =>
+        _deliveryMode == TelemetryDeliveryMode.Synchronous
+            ? throw new InvalidOperationException(
+                $"{nameof(TelemetryData)} is not available when {nameof(ClientOptions.DeliveryMode)} is " +
+                $"{nameof(TelemetryDeliveryMode.Synchronous)} - use {nameof(Monitor)}({nameof(TelemetryHandlers<T>)}<T>, CancellationToken) instead.")
+            : GetTelemetryDataEnumerable();
 
     public bool IsPaused => _isPaused;
 
@@ -238,6 +309,7 @@ public class TelemetryClient<T> : ITelemetryClient<T>, IAsyncDisposable where T 
 
         _logger = logger;
         _ibtOptions = ibtOptions;
+        _deliveryMode = clientOptions?.DeliveryMode ?? TelemetryDeliveryMode.Async;
 
         // initialize bounded channels
         var boundedChannelOptions = new BoundedChannelOptions(CHANNEL_SIZE)
@@ -272,24 +344,17 @@ public class TelemetryClient<T> : ITelemetryClient<T>, IAsyncDisposable where T 
         _simControl = new Lazy<ISimController>(() => new SimController(_logger, () => IsConnected));
     }
 
-    /// <summary>
-    /// starts monitoring telemetry data from either live iRacing or IBT file playback.
-    /// this method can only be called once per TelemetryClient instance.
-    /// </summary>
-    /// <param name="ct">cancellation token to stop monitoring</param>
-    /// <returns>number of telemetry records processed</returns>
-    /// <exception cref="InvalidOperationException">thrown if Monitor() is called while already running</exception>
-    /// <exception cref="ObjectDisposedException">thrown if the client has been disposed</exception>
-    /// <remarks>
-    /// <para><strong>IMPORTANT:</strong> This method can only be called ONCE per TelemetryClient instance.
-    /// After Monitor() completes (via cancellation or IBT file EOF), the client cannot be restarted.
-    /// Create a new client instance for subsequent monitoring sessions.</para>
-    /// <para><strong>Concurrent Calls:</strong> Calling Monitor() while already running will throw
-    /// InvalidOperationException. Ensure the previous Monitor() call has completed before starting
-    /// a new client instance.</para>
-    /// </remarks>
+    /// <inheritdoc />
     public async Task<int> Monitor(CancellationToken ct)
     {
+        if (_deliveryMode == TelemetryDeliveryMode.Synchronous)
+        {
+            throw new InvalidOperationException(
+                $"{nameof(TelemetryDeliveryMode)}.{nameof(TelemetryDeliveryMode.Synchronous)} requires an " +
+                $"{nameof(TelemetryHandlers<T>.OnTelemetryUpdate)} handler - use " +
+                $"{nameof(Monitor)}({nameof(TelemetryHandlers<T>)}<T>, CancellationToken) instead.");
+        }
+
         BeginMonitor();
         return await RunMonitor(ct).ConfigureAwait(false);
     }
@@ -298,6 +363,13 @@ public class TelemetryClient<T> : ITelemetryClient<T>, IAsyncDisposable where T 
     public async Task<int> Monitor(TelemetryHandlers<T> handlers, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(handlers);
+
+        if (_deliveryMode == TelemetryDeliveryMode.Synchronous && handlers.OnTelemetryUpdate == null)
+        {
+            throw new InvalidOperationException(
+                $"{nameof(TelemetryDeliveryMode)}.{nameof(TelemetryDeliveryMode.Synchronous)} requires " +
+                $"{nameof(TelemetryHandlers<T>.OnTelemetryUpdate)} to be set.");
+        }
 
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
 
@@ -370,9 +442,14 @@ public class TelemetryClient<T> : ITelemetryClient<T>, IAsyncDisposable where T 
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error in processing tasks");
-                monitorException = ex;
-                throw;
+                // unwrap a synchronous-handler fault so Monitor() sees the original
+                var toThrow = ex is SyncHandlerFaultException fault ? fault.InnerException! : ex;
+
+                _logger.LogError(toThrow, "Error in processing tasks");
+                monitorException = toThrow;
+
+                ExceptionDispatchInfo.Capture(toThrow).Throw();
+                throw; // unreachable - Throw() always throws, but the compiler can't tell
             }
         }
         finally
@@ -388,7 +465,13 @@ public class TelemetryClient<T> : ITelemetryClient<T>, IAsyncDisposable where T 
         var tasks = new List<Task>();
 
         if (handlers.OnTelemetryUpdate != null)
-            tasks.Add(RunHandlerLoop(HandleTelemetryData(handlers.OnTelemetryUpdate), faultCts));
+        {
+            if (_deliveryMode == TelemetryDeliveryMode.Synchronous)
+                // delivered inline by the producer loop instead - see DeliverTelemetryData
+                _syncTelemetryHandler = handlers.OnTelemetryUpdate;
+            else
+                tasks.Add(RunHandlerLoop(HandleTelemetryData(handlers.OnTelemetryUpdate), faultCts));
+        }
 
         if (handlers.OnSessionInfoUpdate != null)
             tasks.Add(RunHandlerLoop(HandleSessionData(handlers.OnSessionInfoUpdate), faultCts));
@@ -509,20 +592,36 @@ public class TelemetryClient<T> : ITelemetryClient<T>, IAsyncDisposable where T 
 
     public IReadOnlyList<TelemetryVariable> GetTelemetryVariables()
     {
-        // fast path - already cached
-        if (_cachedTelemetryVariables != null)
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        // the provider re-reads and reassigns its header dictionary whenever the var-buffer layout
+        // changes (see DataProviderBase.GetHeader()), so reference identity doubles as a cheap version
+        // check - a different instance means the cache is stale and must be rebuilt
+        var varHeaders = _dataProvider.GetVarHeaders();
+
+        // fast path - already cached against the current header set
+        if (_cachedTelemetryVariables != null && ReferenceEquals(_cachedTelemetryVariablesSourceHeaders, varHeaders))
             return _cachedTelemetryVariables;
+
+        if (varHeaders == null)
+        {
+            // not yet initialized (e.g. live mode before iRacing connects) - nothing to cache, so a
+            // later call once headers are available isn't stuck returning this empty list forever
+            _logger.LogDebug("Telemetry variable headers not available yet");
+            return Array.Empty<TelemetryVariable>();
+        }
 
         lock (_telemetryVariablesLock)
         {
             // double-check pattern
-            if (_cachedTelemetryVariables != null)
+            if (_cachedTelemetryVariables != null && ReferenceEquals(_cachedTelemetryVariablesSourceHeaders, varHeaders))
                 return _cachedTelemetryVariables;
 
             try
             {
-                IReadOnlyList<TelemetryVariable> list = BuildTelemetryVariablesList();
+                IReadOnlyList<TelemetryVariable> list = BuildTelemetryVariablesList(varHeaders);
                 _cachedTelemetryVariables = list;
+                _cachedTelemetryVariablesSourceHeaders = varHeaders;
                 return list;
             }
             catch (ObjectDisposedException)
@@ -537,16 +636,25 @@ public class TelemetryClient<T> : ITelemetryClient<T>, IAsyncDisposable where T 
         }
     }
 
-    private unsafe IReadOnlyList<TelemetryVariable> BuildTelemetryVariablesList()
+    /// <inheritdoc/>
+    public object? GetValue(string varName)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_deliveryMode == TelemetryDeliveryMode.Async)
+        {
+            throw new InvalidOperationException(
+                $"{nameof(GetValue)} is not available when {nameof(ClientOptions.DeliveryMode)} is " +
+                $"{nameof(TelemetryDeliveryMode.Async)} - create the client with " +
+                $"{nameof(TelemetryDeliveryMode.Synchronous)} delivery mode instead.");
+        }
+
+        return _dataProvider.GetVarValue(varName);
+    }
+
+    private unsafe IReadOnlyList<TelemetryVariable> BuildTelemetryVariablesList(VarHeaderDictionary varHeaders)
     {
         var list = new List<TelemetryVariable>();
-        var varHeaders = _dataProvider.GetVarHeaders();
-
-        if (varHeaders == null)
-        {
-            _logger.LogWarning("Variable headers are null, returning empty list");
-            return list;
-        }
 
         foreach (var vh in varHeaders.Values)
         {
@@ -554,16 +662,7 @@ public class TelemetryClient<T> : ITelemetryClient<T>, IAsyncDisposable where T 
             {
                 var tVar = new TelemetryVariable
                 {
-                    Type = vh.type switch
-                    {
-                        irsdk_VarType.irsdk_char => vh.count > 1 ? typeof(string[]) : typeof(string),
-                        irsdk_VarType.irsdk_bool => vh.count > 1 ? typeof(bool[]) : typeof(bool),
-                        irsdk_VarType.irsdk_int => vh.count > 1 ? typeof(int[]) : typeof(int),
-                        irsdk_VarType.irsdk_bitField => vh.count > 1 ? typeof(uint[]) : typeof(uint),
-                        irsdk_VarType.irsdk_float => vh.count > 1 ? typeof(float[]) : typeof(float),
-                        irsdk_VarType.irsdk_double => vh.count > 1 ? typeof(double[]) : typeof(double),
-                        _ => throw new NotImplementedException($"{vh.type} not implemented")
-                    },
+                    Type = DataProviderBase.GetClrType(vh.type, vh.count),
 
                     Length = vh.count,
                     IsTimeValue = vh.countAsTime,
@@ -583,16 +682,7 @@ public class TelemetryClient<T> : ITelemetryClient<T>, IAsyncDisposable where T 
         return list;
     }
 
-    /// <summary>
-    /// Gets a value indicating whether the client is connected to the telemetry source.
-    /// </summary>
-    /// <value>
-    /// <c>true</c> if connected to iRacing (live mode) or an IBT file is open; otherwise <c>false</c>.
-    /// </value>
-    /// <remarks>
-    /// This property is safe to call from any thread and will return <c>false</c> if the client
-    /// has been disposed or is not yet initialized.
-    /// </remarks>
+    /// <inheritdoc />
     public bool IsConnected
     {
         get
@@ -617,30 +707,14 @@ public class TelemetryClient<T> : ITelemetryClient<T>, IAsyncDisposable where T 
         }
     }
 
-    /// <summary>
-    /// Pauses stream data writing. Processing continues, but stream writes are suppressed.
-    /// </summary>
-    /// <remarks>
-    /// <para><strong>Thread Safety:</strong> This method is thread-safe and can be called from any thread.</para>
-    /// <para><strong>Idempotency:</strong> Safe to call multiple times. Calling Pause() when already paused has no effect.</para>
-    /// <para><strong>Eventual Consistency:</strong> Changes are not immediate. A few telemetry samples may be written
-    /// to streams before the pause takes effect (typically 1-2 samples, ~16-32ms at 60Hz).</para>
-    /// </remarks>
+    /// <inheritdoc />
     public void Pause()
     {
         _isPaused = true;
         _logger.LogDebug("Telemetry client paused");
     }
 
-    /// <summary>
-    /// Resumes stream data writing.
-    /// </summary>
-    /// <remarks>
-    /// <para><strong>Thread Safety:</strong> This method is thread-safe and can be called from any thread.</para>
-    /// <para><strong>Idempotency:</strong> Safe to call multiple times. Calling Resume() when not paused has no effect.</para>
-    /// <para><strong>Eventual Consistency:</strong> Changes are not immediate. A few telemetry samples may be suppressed
-    /// before the resume takes effect (typically 1-2 samples, ~16-32ms at 60Hz).</para>
-    /// </remarks>
+    /// <inheritdoc />
     public void Resume()
     {
         _isPaused = false;
@@ -714,8 +788,17 @@ public class TelemetryClient<T> : ITelemetryClient<T>, IAsyncDisposable where T 
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error shutting down main processing task");
-            shutdownException ??= ex;
+            if (ex is SyncHandlerFaultException fault)
+            {
+                // in Synchronous mode, a handler fault lives on _dataProcessingTask itself and was
+                // already thrown so don't surface it a second time here.
+                _logger.LogDebug(fault.InnerException, "Synchronous telemetry handler fault already reported by Monitor()");
+            }
+            else
+            {
+                _logger.LogError(ex, "Error shutting down main processing task");
+                shutdownException ??= ex;
+            }
         }
 
         CompleteAllChannels();
@@ -856,6 +939,13 @@ public class TelemetryClient<T> : ITelemetryClient<T>, IAsyncDisposable where T 
                 _logger.LogDebug("Live data monitoring cancelled after {numUpdates} updates", numUpdates);
                 return numUpdates;
             }
+            catch (SyncHandlerFaultException)
+            {
+                // synchronous telemetry handler threw - fault Monitor() directly, same as Async
+                // mode, instead of treating it as a retryable SDK/provider error
+                _logger.LogDebug("Synchronous telemetry handler threw after {numUpdates} updates; faulting monitoring", numUpdates);
+                throw;
+            }
             catch (Exception e)
             {
                 _logger.LogError(e, "Error processing live data");
@@ -931,9 +1021,7 @@ public class TelemetryClient<T> : ITelemetryClient<T>, IAsyncDisposable where T 
         // suppress events if paused or disposed
         if (!IsPaused)
         {
-            // write to channel
-            var telemetryData = GetTelemetryDataSample();
-            _telemetryDataChannel.Writer.TryWrite(telemetryData);
+            await DeliverTelemetryData(GetTelemetryDataSample()).ConfigureAwait(false);
         }
 
         return true;	// data processed
@@ -946,6 +1034,34 @@ public class TelemetryClient<T> : ITelemetryClient<T>, IAsyncDisposable where T 
 
         T val = _telemetryAccessor.CreateTelemetryDataSample(_dataProvider);
         return val;
+    }
+
+    // keep this method synchronous to avoid building an async
+    private Task DeliverTelemetryData(T telemetryData)
+    {
+        if (_deliveryMode == TelemetryDeliveryMode.Synchronous)
+        {
+            return _syncTelemetryHandler != null
+                ? InvokeSyncTelemetryHandler(telemetryData)
+                : Task.CompletedTask;
+        }
+
+        _telemetryDataChannel.Writer.TryWrite(telemetryData);
+        return Task.CompletedTask;
+    }
+
+    private async Task InvokeSyncTelemetryHandler(T telemetryData)
+    {
+        try
+        {
+            await _syncTelemetryHandler!(telemetryData).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            // this is the caller's handler exception, not an SDK/provider error - wrap it so
+            // catch blocks fault Monitor() instead of treating it as a retryable error routed to OnError
+            throw new SyncHandlerFaultException(ex);
+        }
     }
     private async Task<int> ProcessIbtData(CancellationToken token)
     {
@@ -990,9 +1106,7 @@ public class TelemetryClient<T> : ITelemetryClient<T>, IAsyncDisposable where T 
                 // suppress events if paused or disposed
                 if (!IsPaused)
                 {
-                    // write to channel
-                    var telemetryData = GetTelemetryDataSample();
-                    _telemetryDataChannel.Writer.TryWrite(telemetryData);
+                    await DeliverTelemetryData(GetTelemetryDataSample()).ConfigureAwait(false);
                 }
 
                 // Apply playback speed delay if configured
@@ -1018,6 +1132,11 @@ public class TelemetryClient<T> : ITelemetryClient<T>, IAsyncDisposable where T 
         {
             _logger.LogDebug("IBT data processing cancelled after {numRecords} records", numRecords);
             return numRecords;
+        }
+        catch (SyncHandlerFaultException)
+        {
+            _logger.LogDebug("Synchronous telemetry handler threw after {numRecords} records; faulting monitoring", numRecords);
+            throw;
         }
         catch (Exception e)
         {
