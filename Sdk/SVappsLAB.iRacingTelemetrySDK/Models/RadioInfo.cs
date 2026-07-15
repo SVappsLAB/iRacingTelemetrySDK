@@ -17,40 +17,39 @@
 using System.Collections.Generic;
 
 #nullable disable
-namespace SVappsLAB.iRacingTelemetrySDK
+namespace SVappsLAB.iRacingTelemetrySDK;
+
+public class RadioInfo
 {
-    public class RadioInfo
-    {
-        public int SelectedRadioNum { get; set; } // 0
-        public List<Radio> Radios { get; set; }
+    public int SelectedRadioNum { get; set; } // 0
+    public List<Radio> Radios { get; set; }
 
-    }
+}
 
-    public class Radio
-    {
-        public int RadioNum { get; set; } // 0
-        public int HopCount { get; set; } // 1
-        public int NumFrequencies { get; set; } // 6
-        public int TunedToFrequencyNum { get; set; } // 0
-        public int ScanningIsOn { get; set; } // 1
-        public List<Frequency> Frequencies { get; set; }
+public class Radio
+{
+    public int RadioNum { get; set; } // 0
+    public int HopCount { get; set; } // 1
+    public int NumFrequencies { get; set; } // 6
+    public int TunedToFrequencyNum { get; set; } // 0
+    public int ScanningIsOn { get; set; } // 1
+    public List<Frequency> Frequencies { get; set; }
 
-    }
+}
 
-    public class Frequency
-    {
-        public int FrequencyNum { get; set; } // 0
-        public string FrequencyName { get; set; } // "@ALLTEAMS"
-        public int Priority { get; set; } // 12
-        public int CarIdx { get; set; } // -1
-        public int EntryIdx { get; set; } // -1
-        public int ClubID { get; set; } // 0
-        public int CanScan { get; set; } // 1
-        public int CanSquawk { get; set; } // 1
-        public int Muted { get; set; } // 0
-        public int IsMutable { get; set; } // 1
-        public int IsDeletable { get; set; } // 0
+public class Frequency
+{
+    public int FrequencyNum { get; set; } // 0
+    public string FrequencyName { get; set; } // "@ALLTEAMS"
+    public int Priority { get; set; } // 12
+    public int CarIdx { get; set; } // -1
+    public int EntryIdx { get; set; } // -1
+    public int ClubID { get; set; } // 0
+    public int CanScan { get; set; } // 1
+    public int CanSquawk { get; set; } // 1
+    public int Muted { get; set; } // 0
+    public int IsMutable { get; set; } // 1
+    public int IsDeletable { get; set; } // 0
 
-    }
 }
 #nullable enable

@@ -114,6 +114,19 @@ if (data.IsOnTrackCar) { }    // does not compile because IsOnTrackCar is bool?
 | `await client.GetTelemetryVariables()` | `client.GetTelemetryVariables()` |
 | `.Wait()`, `.Result`, or `Thread.Sleep` in handlers | Use `await`, throttling, or queue expensive work |
 
+## Controlling the Simulator
+
+`client.SimControl` sends commands *to* a live simulator (cameras, replay, pit service, chat, telemetry recording, video capture, force feedback, textures). Commands are fire-and-forget: they return `void` (do not `await` them), give no acknowledgement, and are ignored when iRacing is not running. They only affect a live Windows session — they do nothing in IBT playback mode.
+
+```csharp
+using SVappsLAB.iRacingTelemetrySDK.SimControl;
+
+var sim = client.SimControl;
+sim.Pit.AddFuel(30);                                              // only while in the car
+sim.Camera.SwitchToPosition(CameraFocus.AtLeader, 1, 1);
+sim.Replay.Search(ReplaySearchMode.NextIncident);                 // only while out of the car
+```
+
 ## When To Use Direct Streams
 
 Use direct `IAsyncEnumerable` streams only when the user needs custom backpressure, separate consumers, or maximum IBT processing performance. For those patterns, read:

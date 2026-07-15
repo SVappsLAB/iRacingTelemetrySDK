@@ -2,11 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <RootNamespace>SmokeTests</RootNamespace>
-    <TargetFramework>net8.0</TargetFramework>
-
 
     <!-- standard test project properties -->
     <IsPackable>false</IsPackable>

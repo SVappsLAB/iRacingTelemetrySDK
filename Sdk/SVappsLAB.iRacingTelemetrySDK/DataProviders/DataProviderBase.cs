@@ -24,279 +24,276 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using SVappsLAB.iRacingTelemetrySDK.irSDKDefines;
 
-namespace SVappsLAB.iRacingTelemetrySDK.DataProviders
+namespace SVappsLAB.iRacingTelemetrySDK.DataProviders;
+
+internal enum irsdk_StatusField
 {
-    internal enum irsdk_StatusField
-    {
-        irsdk_stNotConnected = 0,
-        irsdk_stConnected = 1
-    };
+    irsdk_stNotConnected = 0,
+    irsdk_stConnected = 1
+};
 
 
-    internal class VarHeaderDictionary : Dictionary<string, irsdk_varHeader>
+internal class VarHeaderDictionary : Dictionary<string, irsdk_varHeader>
+{
+    public VarHeaderDictionary() : base(StringComparer.InvariantCultureIgnoreCase)
     {
-        public VarHeaderDictionary() : base(StringComparer.InvariantCultureIgnoreCase)
-        {
-        }
+    }
+}
+
+internal abstract unsafe class DataProviderBase : IAsyncDisposable
+{
+    private static readonly Encoding TelemetryEncoding = Encoding.GetEncoding("ISO-8859-1");
+
+    protected ILogger _logger;
+    byte[]? _telemetryDataBuffer;
+    protected byte* _dataPtr;
+    protected irsdk_header _header;
+    int _oldVarBufLen;
+    VarHeaderDictionary? _varHeaders;
+    int _lastSessionInfoUpdate = -1; // latest session info update counter
+
+    protected MemoryMappedFile? _mmFile;
+    protected MemoryMappedViewAccessor? _viewAccessor;
+
+    public DataProviderBase(ILogger logger)
+    {
+        _logger = logger;
+        _logger.LogDebug($"Initializing {GetType().Name}.");
     }
 
-    internal abstract unsafe class DataProviderBase : IAsyncDisposable
+    public virtual ValueTask DisposeAsync()
     {
-        private static readonly Encoding TelemetryEncoding = Encoding.GetEncoding("ISO-8859-1");
-
-        protected ILogger _logger;
-        byte[]? _telemetryDataBuffer;
-        protected byte* _dataPtr;
-        protected irsdk_header _header;
-        int _oldVarBufLen;
-        VarHeaderDictionary? _varHeaders;
-        int _lastSessionInfoUpdate = -1; // latest session info update counter
-
-        protected MemoryMappedFile? _mmFile;
-        protected MemoryMappedViewAccessor? _viewAccessor;
-
-        public DataProviderBase(ILogger logger)
+        if (_viewAccessor != null)
         {
-            _logger = logger;
-            _logger.LogDebug($"Initializing {GetType().Name}.");
+            _viewAccessor.SafeMemoryMappedViewHandle.ReleasePointer();
+            _viewAccessor.Dispose();
+            _viewAccessor = null;
+        }
+        if (_mmFile != null)
+        {
+            _mmFile.Dispose();
+            _mmFile = null;
         }
 
-        public virtual ValueTask DisposeAsync()
-        {
-            if (_viewAccessor != null)
-            {
-                _viewAccessor.SafeMemoryMappedViewHandle.ReleasePointer();
-                _viewAccessor.Dispose();
-                _viewAccessor = null;
-            }
-            if (_mmFile != null)
-            {
-                _mmFile.Dispose();
-                _mmFile = null;
-            }
+        GC.SuppressFinalize(this);
+        return ValueTask.CompletedTask;
+    }
 
-            GC.SuppressFinalize(this);
-            return ValueTask.CompletedTask;
+    public void OpenDataSource(string ibtFilename)
+    {
+    }
+    public abstract void OpenDataSource();
+    public bool IsConnected => (GetHeader().status & irsdk_StatusField.irsdk_stConnected) > 0;
+    public bool IsSessionInfoUpdated()
+    {
+        var siUpdateCount = GetHeader().sessionInfoUpdate;
+        // if nothing has changed
+        if (siUpdateCount == _lastSessionInfoUpdate)
+            return false;
+
+        // new data. update our marker
+        _lastSessionInfoUpdate = siUpdateCount;
+        return true;
+    }
+    public irsdk_header GetHeader()
+    {
+        var ros = new ReadOnlySpan<byte>(_dataPtr, sizeof(irsdk_header));
+        _header = MemoryMarshal.AsRef<irsdk_header>(ros);
+
+        // varbuff changed?
+        if (_oldVarBufLen != _header.bufLen)
+        {
+            _logger.LogDebug("buffLen changed ({oldLength} to {newLength}), updating headers and buffer", _oldVarBufLen, _header.bufLen);
+
+            _varHeaders = ReadVarHeaders();
+            _oldVarBufLen = _header.bufLen;
+
+            // allocate new data buffer
+            _telemetryDataBuffer = new byte[_header.bufLen];
         }
 
-        public void OpenDataSource(string ibtFilename)
+        return _header;
+    }
+    public string GetSessionInfoYaml()
+    {
+        var header = GetHeader();
+        var offSet = header.sessionInfoOffset;
+        var maxLen = header.sessionInfoLen;
+
+        var span = new ReadOnlySpan<byte>(_dataPtr + offSet, maxLen);
+        return SessionInfoDecoder.Decode(span);
+    }
+
+    public object? GetVarValue(string varName)
+    {
+        if (!_varHeaders!.TryGetValue(varName, out irsdk_varHeader vh))
         {
+            _logger.LogDebug("Telemetry variable [{varName}] not found in data provider", varName);
+            return null;
         }
-        public abstract void OpenDataSource();
-        public bool IsConnected => (GetHeader().status & irsdk_StatusField.irsdk_stConnected) > 0;
-        public bool IsSessionInfoUpdated()
+
+        var rosBuffer = _telemetryDataBuffer.AsSpan();
+
+        object val = 0;
+
+        switch (vh.type)
         {
-            var siUpdateCount = GetHeader().sessionInfoUpdate;
-            // if nothing has changed
-            if (siUpdateCount == _lastSessionInfoUpdate)
-                return false;
-
-            // new data. update our marker
-            _lastSessionInfoUpdate = siUpdateCount;
-            return true;
+            case irsdk_VarType.irsdk_char:
+                {
+                    if (vh.count == 1)
+                    {
+                        // read the byte value at the offset
+                        val = rosBuffer[vh.offset];
+                    }
+                    else
+                    {
+                        var span = _telemetryDataBuffer.AsSpan(vh.offset, vh.count);
+                        val = ExtractNullTerminatedString(span, vh.count);
+                    }
+                }
+                break;
+            case irsdk_VarType.irsdk_bool:
+                {
+                    val = GetValue<bool>(rosBuffer, vh.offset, vh.count, vh.type);
+                }
+                break;
+            case irsdk_VarType.irsdk_int:
+            case irsdk_VarType.irsdk_bitField:
+                {
+                    val = GetValue<int>(rosBuffer, vh.offset, vh.count, vh.type);
+                }
+                break;
+            case irsdk_VarType.irsdk_float:
+                {
+                    val = GetValue<float>(rosBuffer, vh.offset, vh.count, vh.type);
+                }
+                break;
+            case irsdk_VarType.irsdk_double:
+                {
+                    val = GetValue<double>(rosBuffer, vh.offset, vh.count, vh.type);
+                }
+                break;
+            default:
+                throw new NotImplementedException($"{vh.type}, not implemented");
         }
-        public irsdk_header GetHeader()
-        {
-            var ros = new ReadOnlySpan<byte>(_dataPtr, sizeof(irsdk_header));
-            _header = MemoryMarshal.AsRef<irsdk_header>(ros);
 
-            // varbuff changed?
-            if (_oldVarBufLen != _header.bufLen)
-            {
-                _logger.LogDebug("buffLen changed ({oldLength} to {newLength}), updating headers and buffer", _oldVarBufLen, _header.bufLen);
+        return val;
+    }
 
-                _varHeaders = ReadVarHeaders();
-                _oldVarBufLen = _header.bufLen;
+    // wait for iRacing to signal there is new data
+    public abstract Task<bool> WaitForDataReady(TimeSpan timeSpan, CancellationToken cancellationToken = default);
 
-                // allocate new data buffer
-                _telemetryDataBuffer = new byte[_header.bufLen];
-            }
+    public VarHeaderDictionary? GetVarHeaders()
+    {
+        return _varHeaders;
+    }
 
-            return _header;
-        }
-        public string GetSessionInfoYaml()
+
+    // with IBT files, the 'recNum' tells us which data record in the mmf we should read
+    protected void CopyNewTelemetryDataToBuffer(int recNum = 0)
+    {
+        var offset = _header.GetMostRecentBuffer().bufOffset + recNum * _header.bufLen;
+        var ros = new ReadOnlySpan<byte>(_dataPtr + offset, _header.bufLen);
+        ros.CopyTo(_telemetryDataBuffer);
+    }
+
+    // live telemetry can be overwritten by the sim while we read it. mirror the
+    // official sdk's torn-read detection: 'tickCountBegin' is updated before a
+    // write starts and 'tickCount' after it completes. if the tickCount read
+    // before the copy matches tickCountBegin after, no write was in progress
+    protected bool TryCopyLiveTelemetryDataToBuffer(out int validTickCount)
+    {
+        const int MAX_ATTEMPTS = 2;
+
+        // try a few times to get the data out
+        for (var attempt = 0; attempt < MAX_ATTEMPTS; attempt++)
         {
             var header = GetHeader();
-            var offSet = header.sessionInfoOffset;
-            var maxLen = header.sessionInfoLen;
+            var bufIndex = header.GetMostRecentBufferIndex();
+            var varBuf = header.GetVarBuf(bufIndex);
 
-            var span = new ReadOnlySpan<byte>(_dataPtr + offSet, maxLen);
-            return SessionInfoDecoder.Decode(span);
-        }
+            var curTickCount = varBuf.tickCount;
+            Thread.MemoryBarrier();
 
-        public object? GetVarValue(string varName)
-        {
-            if (!_varHeaders!.TryGetValue(varName, out irsdk_varHeader vh))
-            {
-                _logger.LogDebug("Telemetry variable [{varName}] not found in data provider", varName);
-                return null;
-            }
-
-            var rosBuffer = _telemetryDataBuffer.AsSpan();
-
-            object val = 0;
-
-            switch (vh.type)
-            {
-                case irsdk_VarType.irsdk_char:
-                    {
-                        if (vh.count == 1)
-                        {
-                            // read the byte value at the offset
-                            val = rosBuffer[vh.offset];
-                        }
-                        else
-                        {
-                            var span = _telemetryDataBuffer.AsSpan(vh.offset, vh.count);
-                            val = ExtractNullTerminatedString(span, vh.count);
-                        }
-                    }
-                    break;
-                case irsdk_VarType.irsdk_bool:
-                    {
-                        val = GetValue<bool>(rosBuffer, vh.offset, vh.count, vh.type);
-                    }
-                    break;
-                case irsdk_VarType.irsdk_int:
-                case irsdk_VarType.irsdk_bitField:
-                    {
-                        val = GetValue<int>(rosBuffer, vh.offset, vh.count, vh.type);
-                    }
-                    break;
-                case irsdk_VarType.irsdk_float:
-                    {
-                        val = GetValue<float>(rosBuffer, vh.offset, vh.count, vh.type);
-                    }
-                    break;
-                case irsdk_VarType.irsdk_double:
-                    {
-                        val = GetValue<double>(rosBuffer, vh.offset, vh.count, vh.type);
-                    }
-                    break;
-                default:
-                    throw new NotImplementedException($"{vh.type}, not implemented");
-            }
-
-            return val;
-        }
-
-        // wait for iRacing to signal there is new data
-        public abstract Task<bool> WaitForDataReady(TimeSpan timeSpan, CancellationToken cancellationToken = default);
-
-        public VarHeaderDictionary? GetVarHeaders()
-        {
-            return _varHeaders;
-        }
-
-
-        // with IBT files, the 'recNum' tells us which data record in the mmf we should read
-        protected void CopyNewTelemetryDataToBuffer(int recNum = 0)
-        {
-            var offset = _header.GetMostRecentBuffer().bufOffset + recNum * _header.bufLen;
-            var ros = new ReadOnlySpan<byte>(_dataPtr + offset, _header.bufLen);
+            var ros = new ReadOnlySpan<byte>(_dataPtr + varBuf.bufOffset, header.bufLen);
             ros.CopyTo(_telemetryDataBuffer);
-        }
 
-        // live telemetry can be overwritten by the sim while we read it. mirror the
-        // official sdk's torn-read detection: 'tickCountBegin' is updated before a
-        // write starts and 'tickCount' after it completes. if the tickCount read
-        // before the copy matches tickCountBegin after, no write was in progress
-        protected bool TryCopyLiveTelemetryDataToBuffer(out int validTickCount)
-        {
-            const int MAX_ATTEMPTS = 2;
+            Thread.MemoryBarrier();
 
-            // try a few times to get the data out
-            for (var attempt = 0; attempt < MAX_ATTEMPTS; attempt++)
+            // re-read from shared memory to see if a write was in progress
+            if (curTickCount == GetHeader().GetVarBuf(bufIndex).tickCountBegin)
             {
-                var header = GetHeader();
-                var bufIndex = header.GetMostRecentBufferIndex();
-                var varBuf = header.GetVarBuf(bufIndex);
-
-                var curTickCount = varBuf.tickCount;
-                Thread.MemoryBarrier();
-
-                var ros = new ReadOnlySpan<byte>(_dataPtr + varBuf.bufOffset, header.bufLen);
-                ros.CopyTo(_telemetryDataBuffer);
-
-                Thread.MemoryBarrier();
-
-                // re-read from shared memory to see if a write was in progress
-                if (curTickCount == GetHeader().GetVarBuf(bufIndex).tickCountBegin)
-                {
-                    validTickCount = curTickCount;
-                    return true;
-                }
+                validTickCount = curTickCount;
+                return true;
             }
-
-            // the data changed out from under us
-            validTickCount = 0;
-            return false;
         }
 
-        VarHeaderDictionary ReadVarHeaders()
-        {
-            var ros = new ReadOnlySpan<irsdk_varHeader>(_dataPtr + _header.varHeaderOffset, _header.numVars);
-
-            var dict = new VarHeaderDictionary();
-            for (int i = 0; i < _header.numVars; i++)
-            {
-                var vh = ros[i];
-                var name = Marshal.PtrToStringAnsi(new nint(vh.name)) ?? string.Empty;
-
-                dict.Add(name, vh);
-            }
-
-            return dict;
-        }
-
-        /// <summary>
-        /// Extract a null-terminated string from a byte span using the specified encoding
-        /// </summary>
-        /// <param name="data">The byte span containing the string data</param>
-        /// <param name="expectedLength">The maximum expected length of the string</param>
-        /// <returns>Decoded string up to the first null byte or end of span</returns>
-        private string ExtractNullTerminatedString(Span<byte> data, int expectedLength)
-        {
-            // Scan for null terminator
-            int actualLength = data.Length;
-            for (int i = 0; i < data.Length; i++)
-            {
-                if (data[i] == 0)
-                {
-                    actualLength = i;
-                    if (actualLength < expectedLength)
-                    {
-                        _logger.LogDebug("String length is {actualLength}, but expected length was {expectedLength}", actualLength, expectedLength);
-                    }
-                    break;
-                }
-            }
-            return TelemetryEncoding.GetString(data.Slice(0, actualLength));
-        }
-
-        object GetValue<T>(ReadOnlySpan<byte> span, int offset, int count, irsdk_VarType type) where T : struct
-        {
-            int elementSizeInBytes = type switch
-            {
-                irsdk_VarType.irsdk_bool => sizeof(bool),
-                irsdk_VarType.irsdk_int => sizeof(int),
-                irsdk_VarType.irsdk_bitField => sizeof(int),
-                irsdk_VarType.irsdk_float => sizeof(float),
-                irsdk_VarType.irsdk_double => sizeof(double),
-                _ => throw new NotImplementedException($"{type} size not implemented")
-            };
-
-            var ros = MemoryMarshal.Cast<byte, T>(span.Slice(offset, count * elementSizeInBytes));
-
-            // optimize memory allocation: avoid array allocation for single values
-            if (count == 1)
-                return ros[0];
-            else
-                return ros.ToArray();
-        }
-
+        // the data changed out from under us
+        validTickCount = 0;
+        return false;
     }
 
+    VarHeaderDictionary ReadVarHeaders()
+    {
+        var ros = new ReadOnlySpan<irsdk_varHeader>(_dataPtr + _header.varHeaderOffset, _header.numVars);
+
+        var dict = new VarHeaderDictionary();
+        for (int i = 0; i < _header.numVars; i++)
+        {
+            var vh = ros[i];
+            var name = Marshal.PtrToStringAnsi(new nint(vh.name)) ?? string.Empty;
+
+            dict.Add(name, vh);
+        }
+
+        return dict;
+    }
+
+    /// <summary>
+    /// Extract a null-terminated string from a byte span using the specified encoding
+    /// </summary>
+    /// <param name="data">The byte span containing the string data</param>
+    /// <param name="expectedLength">The maximum expected length of the string</param>
+    /// <returns>Decoded string up to the first null byte or end of span</returns>
+    private string ExtractNullTerminatedString(Span<byte> data, int expectedLength)
+    {
+        // Scan for null terminator
+        int actualLength = data.Length;
+        for (int i = 0; i < data.Length; i++)
+        {
+            if (data[i] == 0)
+            {
+                actualLength = i;
+                if (actualLength < expectedLength)
+                {
+                    _logger.LogDebug("String length is {actualLength}, but expected length was {expectedLength}", actualLength, expectedLength);
+                }
+                break;
+            }
+        }
+        return TelemetryEncoding.GetString(data.Slice(0, actualLength));
+    }
+
+    object GetValue<T>(ReadOnlySpan<byte> span, int offset, int count, irsdk_VarType type) where T : struct
+    {
+        int elementSizeInBytes = type switch
+        {
+            irsdk_VarType.irsdk_bool => sizeof(bool),
+            irsdk_VarType.irsdk_int => sizeof(int),
+            irsdk_VarType.irsdk_bitField => sizeof(int),
+            irsdk_VarType.irsdk_float => sizeof(float),
+            irsdk_VarType.irsdk_double => sizeof(double),
+            _ => throw new NotImplementedException($"{type} size not implemented")
+        };
+
+        var ros = MemoryMarshal.Cast<byte, T>(span.Slice(offset, count * elementSizeInBytes));
+
+        // optimize memory allocation: avoid array allocation for single values
+        if (count == 1)
+            return ros[0];
+        else
+            return ros.ToArray();
+    }
 
 }
 

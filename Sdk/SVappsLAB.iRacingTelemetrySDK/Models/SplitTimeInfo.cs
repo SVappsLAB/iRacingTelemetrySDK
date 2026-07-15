@@ -17,19 +17,18 @@
 using System.Collections.Generic;
 
 #nullable disable
-namespace SVappsLAB.iRacingTelemetrySDK
+namespace SVappsLAB.iRacingTelemetrySDK;
+
+public class SplitTimeInfo
 {
-    public class SplitTimeInfo
-    {
-        public List<Sector> Sectors { get; set; }
+    public List<Sector> Sectors { get; set; }
 
-    }
+}
 
-    public class Sector
-    {
-        public int SectorNum { get; set; } // 0
-        public float SectorStartPct { get; set; } // in percentage
+public class Sector
+{
+    public int SectorNum { get; set; } // 0
+    public float SectorStartPct { get; set; } // in percentage
 
-    }
 }
 #nullable enable

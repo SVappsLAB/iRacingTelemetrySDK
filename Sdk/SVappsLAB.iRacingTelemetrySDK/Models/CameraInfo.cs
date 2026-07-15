@@ -17,29 +17,28 @@
 using System.Collections.Generic;
 
 #nullable disable
-namespace SVappsLAB.iRacingTelemetrySDK
+namespace SVappsLAB.iRacingTelemetrySDK;
+
+
+public class CameraInfo
 {
+    public List<Group> Groups { get; set; }
 
-    public class CameraInfo
-    {
-        public List<Group> Groups { get; set; }
+}
 
-    }
+public class Group
+{
+    public int GroupNum { get; set; } // 1
+    public string GroupName { get; set; } // "Nose"
+    public bool IsScenic { get; set; } // Added for the Scenic group
+    public List<Camera> Cameras { get; set; }
 
-    public class Group
-    {
-        public int GroupNum { get; set; } // 1
-        public string GroupName { get; set; } // "Nose"
-        public bool IsScenic { get; set; } // Added for the Scenic group
-        public List<Camera> Cameras { get; set; }
+}
 
-    }
+public class Camera
+{
+    public int CameraNum { get; set; } // 1
+    public string CameraName { get; set; } // "CamNose"
 
-    public class Camera
-    {
-        public int CameraNum { get; set; } // 1
-        public string CameraName { get; set; } // "CamNose"
-
-    }
 }
 #nullable enable

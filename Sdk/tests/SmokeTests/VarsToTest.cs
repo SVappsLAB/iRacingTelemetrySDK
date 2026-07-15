@@ -16,20 +16,19 @@
 
 using SVappsLAB.iRacingTelemetrySDK;
 
-namespace SmokeTests
+namespace SmokeTests;
+
+// this class is only used as a convenient place to define a
+// set of shared variables that the live and ibt test classes can use
+[RequiredTelemetryVars([
+    TelemetryVar.dcPushToPass,      // type 1 - boolean
+    TelemetryVar.SessionNum,        // type 2 - int
+    TelemetryVar.CarIdxTrackSurface, // type 2 - int  (ARRAY)
+    TelemetryVar.EngineWarnings,    // type 3 - bitfield (flags)
+    TelemetryVar.RPM,               // type 4 - float
+    TelemetryVar.SessionTime,       // type 5 - double
+    TelemetryVar.CarDistAhead,      // new var, doesn't exist in old ibt files
+    ])]
+public class VarsToTest
 {
-    // this class is only used as a convenient place to define a
-    // set of shared variables that the live and ibt test classes can use
-    [RequiredTelemetryVars([
-        TelemetryVar.dcPushToPass,      // type 1 - boolean
-        TelemetryVar.SessionNum,        // type 2 - int
-        TelemetryVar.CarIdxTrackSurface, // type 2 - int  (ARRAY)
-        TelemetryVar.EngineWarnings,    // type 3 - bitfield (flags)
-        TelemetryVar.RPM,               // type 4 - float
-        TelemetryVar.SessionTime,       // type 5 - double
-        TelemetryVar.CarDistAhead,      // new var, doesn't exist in old ibt files
-        ])]
-    public class VarsToTest
-    {
-    }
 }

@@ -24,93 +24,92 @@ using Microsoft.Extensions.Logging;
 using SVappsLAB.iRacingTelemetrySDK.IBTPlayback;
 using SVappsLAB.iRacingTelemetrySDK.irSDKDefines;
 
-namespace SVappsLAB.iRacingTelemetrySDK.DataProviders
+namespace SVappsLAB.iRacingTelemetrySDK.DataProviders;
+
+internal unsafe class IBTDataProvider : DataProviderBase, IDataProvider
 {
-    internal unsafe class IBTDataProvider : DataProviderBase, IDataProvider
+    readonly IBTOptions _ibtOptions;
+    readonly IPlaybackGovernor _governor;
+    int _numRecords = 0;
+    int _currentRecord = 0;
+
+    public IBTDataProvider(ILogger logger, IBTOptions ibtOptions) : base(logger)
     {
-        readonly IBTOptions _ibtOptions;
-        readonly IPlaybackGovernor _governor;
-        int _numRecords = 0;
-        int _currentRecord = 0;
 
-        public IBTDataProvider(ILogger logger, IBTOptions ibtOptions) : base(logger)
+        if (!File.Exists(ibtOptions.IbtFilePath))
         {
-
-            if (!File.Exists(ibtOptions.IbtFilePath))
-            {
-                throw new FileNotFoundException($"IBT file [{ibtOptions.IbtFilePath}] not found", ibtOptions.IbtFilePath);
-            }
-            if (!ibtOptions.IbtFilePath.EndsWith(".ibt"))
-            {
-                throw new ArgumentException($"File [{ibtOptions.IbtFilePath}] is not an IBT file", ibtOptions.IbtFilePath);
-            }
-            _ibtOptions = ibtOptions;
-            _governor = new SimpleGovernor(_logger, _ibtOptions!.PlayBackSpeedMultiplier);
+            throw new FileNotFoundException($"IBT file [{ibtOptions.IbtFilePath}] not found", ibtOptions.IbtFilePath);
         }
-
-        public override void OpenDataSource()
+        if (!ibtOptions.IbtFilePath.EndsWith(".ibt"))
         {
-            // open in shared mode so multiple processes (or tests) can access the same file
-            _mmFile = MemoryMappedFile.CreateFromFile(_ibtOptions.IbtFilePath, FileMode.Open, null, 0, MemoryMappedFileAccess.Read);
-            _viewAccessor = _mmFile.CreateViewAccessor(0, 0, MemoryMappedFileAccess.Read);
-            _viewAccessor!.SafeMemoryMappedViewHandle.AcquirePointer(ref _dataPtr);
-
-            // read header 
-            _header = GetHeader();
-
-            _numRecords = GetNumRecordsInIBTFile();
-
-            _governor.StartPlayback();
+            throw new ArgumentException($"File [{ibtOptions.IbtFilePath}] is not an IBT file", ibtOptions.IbtFilePath);
         }
-
-        public int GetNumRecordsInIBTFile()
-        {
-            var numRecs = GetDiskSubHeader().sessionRecordCount;
-            return numRecs;
-        }
-
-        // wait for iRacing to signal there is new data
-        public override Task<bool> WaitForDataReady(TimeSpan _timeSpan, CancellationToken cancellationToken = default)
-        {
-            return IBTDataProviderAsyncHelper.WaitForDataReady(_governor, _currentRecord, this);
-        }
-
-        internal bool ProcessNextRecord()
-        {
-            CopyNewTelemetryDataToBuffer(_currentRecord);
-
-            _currentRecord++;
-
-            // return true if there is more data to process
-            return _currentRecord < _numRecords;
-        }
-
-        irsdk_diskSubHeader GetDiskSubHeader()
-        {
-            // the disksubheader is located after the header
-            var offset = sizeof(irsdk_header);
-
-            var ros = new ReadOnlySpan<byte>(_dataPtr + offset, sizeof(irsdk_diskSubHeader));
-            var diskSubHeader = MemoryMarshal.AsRef<irsdk_diskSubHeader>(ros);
-
-            return diskSubHeader;
-        }
-        public override ValueTask DisposeAsync()
-        {
-            // IBTDataProvider doesn't have additional resources to dispose
-            return base.DisposeAsync();
-        }
+        _ibtOptions = ibtOptions;
+        _governor = new SimpleGovernor(_logger, _ibtOptions!.PlayBackSpeedMultiplier);
     }
 
-    // Helper class to handle async operations outside unsafe context
-    internal static class IBTDataProviderAsyncHelper
+    public override void OpenDataSource()
     {
-        public static async Task<bool> WaitForDataReady(IPlaybackGovernor governor, int currentRecord, IBTDataProvider provider)
-        {
-            // throttle playback speed
-            await governor.GovernSpeed(currentRecord).ConfigureAwait(false);
+        // open in shared mode so multiple processes (or tests) can access the same file
+        _mmFile = MemoryMappedFile.CreateFromFile(_ibtOptions.IbtFilePath, FileMode.Open, null, 0, MemoryMappedFileAccess.Read);
+        _viewAccessor = _mmFile.CreateViewAccessor(0, 0, MemoryMappedFileAccess.Read);
+        _viewAccessor!.SafeMemoryMappedViewHandle.AcquirePointer(ref _dataPtr);
 
-            return provider.ProcessNextRecord();
-        }
+        // read header 
+        _header = GetHeader();
+
+        _numRecords = GetNumRecordsInIBTFile();
+
+        _governor.StartPlayback();
+    }
+
+    public int GetNumRecordsInIBTFile()
+    {
+        var numRecs = GetDiskSubHeader().sessionRecordCount;
+        return numRecs;
+    }
+
+    // wait for iRacing to signal there is new data
+    public override Task<bool> WaitForDataReady(TimeSpan _timeSpan, CancellationToken cancellationToken = default)
+    {
+        return IBTDataProviderAsyncHelper.WaitForDataReady(_governor, _currentRecord, this);
+    }
+
+    internal bool ProcessNextRecord()
+    {
+        CopyNewTelemetryDataToBuffer(_currentRecord);
+
+        _currentRecord++;
+
+        // return true if there is more data to process
+        return _currentRecord < _numRecords;
+    }
+
+    irsdk_diskSubHeader GetDiskSubHeader()
+    {
+        // the disksubheader is located after the header
+        var offset = sizeof(irsdk_header);
+
+        var ros = new ReadOnlySpan<byte>(_dataPtr + offset, sizeof(irsdk_diskSubHeader));
+        var diskSubHeader = MemoryMarshal.AsRef<irsdk_diskSubHeader>(ros);
+
+        return diskSubHeader;
+    }
+    public override ValueTask DisposeAsync()
+    {
+        // IBTDataProvider doesn't have additional resources to dispose
+        return base.DisposeAsync();
+    }
+}
+
+// Helper class to handle async operations outside unsafe context
+internal static class IBTDataProviderAsyncHelper
+{
+    public static async Task<bool> WaitForDataReady(IPlaybackGovernor governor, int currentRecord, IBTDataProvider provider)
+    {
+        // throttle playback speed
+        await governor.GovernSpeed(currentRecord).ConfigureAwait(false);
+
+        return provider.ProcessNextRecord();
     }
 }

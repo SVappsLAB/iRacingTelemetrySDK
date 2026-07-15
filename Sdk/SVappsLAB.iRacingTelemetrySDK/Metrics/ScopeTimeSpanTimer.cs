@@ -16,21 +16,20 @@
 
 using System;
 
-namespace SVappsLAB.iRacingTelemetrySDK.Metrics
+namespace SVappsLAB.iRacingTelemetrySDK.Metrics;
+
+internal class ScopeTimeSpanTimer : IDisposable
 {
-    internal class ScopeTimeSpanTimer : IDisposable
+    long _timeStamp;
+    readonly Action<TimeSpan> _lambda;
+    public ScopeTimeSpanTimer(Action<TimeSpan> lambda)
     {
-        long _timeStamp;
-        readonly Action<TimeSpan> _lambda;
-        public ScopeTimeSpanTimer(Action<TimeSpan> lambda)
-        {
-            _lambda = lambda;
-            _timeStamp = TimeProvider.System.GetTimestamp();
-        }
-        public void Dispose()
-        {
-            var elapsed = TimeProvider.System.GetElapsedTime(_timeStamp);
-            _lambda(elapsed);
-        }
+        _lambda = lambda;
+        _timeStamp = TimeProvider.System.GetTimestamp();
+    }
+    public void Dispose()
+    {
+        var elapsed = TimeProvider.System.GetElapsedTime(_timeStamp);
+        _lambda(elapsed);
     }
 }

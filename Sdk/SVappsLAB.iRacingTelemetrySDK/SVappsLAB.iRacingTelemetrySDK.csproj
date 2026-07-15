@@ -1,9 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <LangVersion>Latest</LangVersion>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
@@ -36,18 +33,17 @@
     <!-- nuget package - analyzers/dotnet/cs -->
     <None Include="..\SVappsLAB.iRacingTelemetrySDK.CodeGen\bin\$(Configuration)\netstandard2.0\SVappsLAB.iRacingTelemetrySDK.CodeGen.dll" Pack="true" PackagePath="analyzers/dotnet/cs/" Visible="false" />
     <None Include="bin\$(Configuration)\net8.0\SVappsLAB.iRacingTelemetrySDK.EnumsAndFlags.dll" Pack="true" PackagePath="analyzers/dotnet/cs/" Visible="false" PrivateAssets="all" />
-    <!-- nuget package - include enum types with SDK -->
     <None Include="bin\$(Configuration)\net8.0\SVappsLAB.iRacingTelemetrySDK.EnumsAndFlags.dll" Pack="true" PackagePath="lib/net8.0/" Visible="false" PrivateAssets="all" />
   </ItemGroup>
 
   <PropertyGroup>
     <PackageId>SVappsLAB.iRacingTelemetrySDK</PackageId>
     <Title>iRacing Telemetry SDK</Title>
-    <Description>A C# SDK for accessing iRacing telemetry (iRacing SDK)</Description>
-    <PackageTags>iRacing iRacingSDK irsdk IBT Telemetry SDK API</PackageTags>
+    <Description>A C# SDK for live iRacing telemetry, IBT file playback, and simulator control.</Description>
+    <PackageTags>iRacing iRacingSDK irsdk IBT telemetry SDK API sim-control replay broadcast</PackageTags>
     <PackageReadmeFile>NUGET.md</PackageReadmeFile>
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
-    <Version>2.1.0</Version>
+    <Version>2.2.0</Version>
     <Authors>Scott Velez</Authors>
     <Company>SVappsLAB</Company>
     <Copyright>Copyright (c) 2026 SVappsLAB</Copyright>

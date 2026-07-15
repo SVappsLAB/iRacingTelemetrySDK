@@ -1,5 +1,5 @@
 # iRacing Telemetry SDK - Advanced SDK Reference
-<!-- VERSION: 2.0.1 -->
+<!-- VERSION: 2.2.0 -->
 
 This file contains advanced patterns for AI coding assistants building consumer applications. Read `docs/ai/SDK_USAGE.md` first.
 
@@ -149,6 +149,33 @@ foreach (var variable in vars)
 `TelemetryVariable` includes `Name`, `Desc`, `Units`, `Type`, `Length`, and `IsTimeValue`.
 
 `Pause()` suppresses stream writes while internal processing continues. `Resume()` restarts stream writes. Pause and resume are thread-safe and idempotent.
+
+## Simulator Control (SimControl)
+
+`client.SimControl` returns an `ISimController` for sending commands *to* the simulator. Commands are synchronous `void` calls (do not `await`), fire-and-forget with no acknowledgement, and are ignored when iRacing is not running. They work independently of `Monitor(...)` and connection state, but only affect a live Windows session — never IBT playback. Sending while disconnected logs a warning.
+
+```csharp
+using SVappsLAB.iRacingTelemetrySDK.SimControl;
+
+var sim = client.SimControl;
+```
+
+| Group | Purpose | Representative methods |
+| --- | --- | --- |
+| `sim.Camera` | Camera focus and state | `SwitchToPosition(CameraFocus, group, camera)`, `SwitchToCar(carNumber, group, camera)`, `SetState(CameraState)` |
+| `sim.Replay` | Replay playback and tape search | `SetPlaySpeed(speed, slowMotion)`, `SetPlayPosition(mode, frame)`, `Search(ReplaySearchMode)`, `SearchSessionTime(...)`, `EraseTape()` |
+| `sim.Pit` | Pit service requests (in-car only) | `AddFuel(liters)`, `ChangeTire(TireLocation, pressureKPa)`, `ChangeTireCompound(index)`, `RequestFastRepair()`, `CleanWindshield()`, `ClearAll()`, cancel variants |
+| `sim.Chat` | Chat window and macros | `Open()`, `Close()`, `SendMacro(n)`, `ReplyToPrivateChat()` |
+| `sim.TelemetryRecording` | Disk (IBT) recording | `Start()`, `Stop()`, `Restart()` |
+| `sim.VideoCapture` | Screenshot and video capture | `CaptureScreenshot()`, `Start()`, `Stop()`, `Toggle()`, `ShowTimer()`, `HideTimer()` |
+| `sim.ForceFeedback` | FFB configuration | `SetMaxForce(maxForceNm)` |
+| `sim.Textures` | Car texture reloading | `ReloadAll()`, `ReloadForCar(carIdx)` |
+
+Notes for generated code:
+
+- Pit commands only work while the player is in the car; replay/camera control while out of the car.
+- Invalid arguments (negative fuel, out-of-range indexes) throw `ArgumentException`-family exceptions at the call site — validation is the only feedback mechanism.
+- There is no query API: commands do not report simulator state. Read telemetry variables (for example `CamCarIdx`, `ReplayPlaySpeed`) to observe effects.
 
 ## Buffer Behavior
 
