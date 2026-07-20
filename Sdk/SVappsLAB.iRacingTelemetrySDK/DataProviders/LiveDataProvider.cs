@@ -20,98 +20,97 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
-namespace SVappsLAB.iRacingTelemetrySDK.DataProviders
+namespace SVappsLAB.iRacingTelemetrySDK.DataProviders;
+
+internal unsafe class LiveDataProvider : DataProviderBase, IDataProvider
 {
-    internal unsafe class LiveDataProvider : DataProviderBase, IDataProvider
+    const string IRSDK_MemMapFileName = @"Local\IRSDKMemMapFileName";
+    const string IRSDK_DataValidEventName = @"Local\IRSDKDataValidEvent";
+    const int SYNCHRONIZE = 0x00100000; // access right for synchronization
+
+    int _dataDropCount = 0;
+    int _lastTickCount = 0; // latest tick count iRacing wrote to
+    AutoResetEvent? _dataReadyEvent;
+
+    public LiveDataProvider(ILogger logger) : base(logger)
     {
-        const string IRSDK_MemMapFileName = @"Local\IRSDKMemMapFileName";
-        const string IRSDK_DataValidEventName = @"Local\IRSDKDataValidEvent";
-        const int SYNCHRONIZE = 0x00100000; // access right for synchronization
-
-        int _dataDropCount = 0;
-        int _lastTickCount = 0; // latest tick count iRacing wrote to
-        AutoResetEvent? _dataReadyEvent;
-
-        public LiveDataProvider(ILogger logger) : base(logger)
-        {
-        }
-
-        public override void OpenDataSource()
-        {
-            _mmFile = MemoryMappedFile.OpenExisting(IRSDK_MemMapFileName);
-            _viewAccessor = _mmFile.CreateViewAccessor();
-            _viewAccessor!.SafeMemoryMappedViewHandle.AcquirePointer(ref _dataPtr);
-
-            // read header 
-            _header = GetHeader();
-
-            // data ready event
-            var rawEvent = PInvoke.OpenEvent(SYNCHRONIZE, false, IRSDK_DataValidEventName);
-            _dataReadyEvent = new AutoResetEvent(false) { SafeWaitHandle = new Microsoft.Win32.SafeHandles.SafeWaitHandle(rawEvent, true) };
-        }
-
-        public override Task<bool> WaitForDataReady(TimeSpan timeSpan, CancellationToken cancellationToken = default)
-        {
-            return LiveDataProviderAsyncHelper.WaitForDataReady(_dataReadyEvent!, timeSpan, cancellationToken, _logger, this);
-        }
-
-        internal bool ProcessNewData()
-        {
-            // copy new data to the access buffer,
-			// validating data is good and no write was in progress
-            if (!TryCopyLiveTelemetryDataToBuffer(out var latestTickCount))
-            {
-                _logger.LogWarning("data changed while we were reading it. skipping this sample");
-                return false;
-            }
-
-            // if we missed any telemetry data, log that it happened
-            if (latestTickCount > _lastTickCount)
-            {
-                var tickDiff = latestTickCount - _lastTickCount - 1;
-                if (_lastTickCount != 0 && tickDiff > 0)
-                {
-                    _dataDropCount += tickDiff;
-                    _logger.LogWarning("dropped {count} data records. a total of {total} missed so far. last tick: {lastTick}, current tick: {currentTick}", tickDiff, _dataDropCount, _lastTickCount, latestTickCount);
-                }
-            }
-
-            // did we loose sync?  perhaps we disconnected or a new session started
-            // log that it happened. we will resync below
-            if (latestTickCount < _lastTickCount)
-            {
-                _logger.LogDebug("new data is older than our last sample. lost connection?  will resync");
-            }
-
-            // resync - update our last tick count
-            _lastTickCount = latestTickCount;
-
-            return true;
-        }
-        public override ValueTask DisposeAsync()
-        {
-            if (_dataReadyEvent != null)
-            {
-                _dataReadyEvent.Dispose();
-                _dataReadyEvent = null;
-            }
-            return base.DisposeAsync();
-        }
     }
 
-    // Helper class to handle async operations outside unsafe context
-    internal static class LiveDataProviderAsyncHelper
+    public override void OpenDataSource()
     {
-        public static async Task<bool> WaitForDataReady(AutoResetEvent dataReadyEvent, TimeSpan timeSpan, CancellationToken cancellationToken, ILogger logger, LiveDataProvider provider)
-        {
-            var signaled = await Task.Run(() => dataReadyEvent.WaitOne(timeSpan), cancellationToken).ConfigureAwait(false);
-            if (!signaled)
-            {
-                logger.LogDebug("timeout waiting for data ready event");
-                return false;
-            }
+        _mmFile = MemoryMappedFile.OpenExisting(IRSDK_MemMapFileName);
+        _viewAccessor = _mmFile.CreateViewAccessor();
+        _viewAccessor!.SafeMemoryMappedViewHandle.AcquirePointer(ref _dataPtr);
 
-            return provider.ProcessNewData();
+        // read header 
+        _header = GetHeader();
+
+        // data ready event
+        var rawEvent = PInvoke.OpenEvent(SYNCHRONIZE, false, IRSDK_DataValidEventName);
+        _dataReadyEvent = new AutoResetEvent(false) { SafeWaitHandle = new Microsoft.Win32.SafeHandles.SafeWaitHandle(rawEvent, true) };
+    }
+
+    public override Task<bool> WaitForDataReady(TimeSpan timeSpan, CancellationToken cancellationToken = default)
+    {
+        return LiveDataProviderAsyncHelper.WaitForDataReady(_dataReadyEvent!, timeSpan, cancellationToken, _logger, this);
+    }
+
+    internal bool ProcessNewData()
+    {
+        // copy new data to the access buffer,
+			// validating data is good and no write was in progress
+        if (!TryCopyLiveTelemetryDataToBuffer(out var latestTickCount))
+        {
+            _logger.LogWarning("data changed while we were reading it. skipping this sample");
+            return false;
         }
+
+        // if we missed any telemetry data, log that it happened
+        if (latestTickCount > _lastTickCount)
+        {
+            var tickDiff = latestTickCount - _lastTickCount - 1;
+            if (_lastTickCount != 0 && tickDiff > 0)
+            {
+                _dataDropCount += tickDiff;
+                _logger.LogWarning("dropped {count} data records. a total of {total} missed so far. last tick: {lastTick}, current tick: {currentTick}", tickDiff, _dataDropCount, _lastTickCount, latestTickCount);
+            }
+        }
+
+        // did we loose sync?  perhaps we disconnected or a new session started
+        // log that it happened. we will resync below
+        if (latestTickCount < _lastTickCount)
+        {
+            _logger.LogDebug("new data is older than our last sample. lost connection?  will resync");
+        }
+
+        // resync - update our last tick count
+        _lastTickCount = latestTickCount;
+
+        return true;
+    }
+    public override ValueTask DisposeAsync()
+    {
+        if (_dataReadyEvent != null)
+        {
+            _dataReadyEvent.Dispose();
+            _dataReadyEvent = null;
+        }
+        return base.DisposeAsync();
+    }
+}
+
+// Helper class to handle async operations outside unsafe context
+internal static class LiveDataProviderAsyncHelper
+{
+    public static async Task<bool> WaitForDataReady(AutoResetEvent dataReadyEvent, TimeSpan timeSpan, CancellationToken cancellationToken, ILogger logger, LiveDataProvider provider)
+    {
+        var signaled = await Task.Run(() => dataReadyEvent.WaitOne(timeSpan), cancellationToken).ConfigureAwait(false);
+        if (!signaled)
+        {
+            logger.LogDebug("timeout waiting for data ready event");
+            return false;
+        }
+
+        return provider.ProcessNewData();
     }
 }

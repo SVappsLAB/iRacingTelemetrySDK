@@ -1,12 +1,12 @@
 /**
  * Copyright (C) 2024-2026 Scott Velez
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -14,17 +14,18 @@
  * limitations under the License.
 **/
 
-using System;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 
-namespace SVappsLAB.iRacingTelemetrySDK
+namespace SVappsLAB.iRacingTelemetrySDK.SimControl;
+
+[SupportedOSPlatform("windows")]
+internal static class PInvoke
 {
-    internal class PInvoke
-    {
-        [DllImport("kernel32.dll", SetLastError = true)]
-        public static extern nint OpenEvent(uint dwDesiredAccess, bool bInheritHandle, string lpName);
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    public static extern uint RegisterWindowMessage(string lpString);
 
-        [DllImport("kernel32.dll")]
-        public static extern bool CloseHandle(nint hObject);
-    }
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool SendNotifyMessage(nint hWnd, uint msg, nint wParam, nint lParam);
 }

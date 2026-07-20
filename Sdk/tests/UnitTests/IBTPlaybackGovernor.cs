@@ -26,71 +26,70 @@ using SVappsLAB.iRacingTelemetrySDK.IBTPlayback;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
-namespace UnitTests
+namespace UnitTests;
+
+public class LogFixture
 {
-    public class LogFixture
+    public Microsoft.Extensions.Logging.ILogger Logger;
+    public LogFixture()
     {
-        public Microsoft.Extensions.Logging.ILogger Logger;
-        public LogFixture()
-        {
 #if DEBUG
-            Log.Logger = new LoggerConfiguration()
-                .MinimumLevel.Debug()
-                .WriteTo.File("governorStatsOutput.log")
-                .CreateLogger();
+        Log.Logger = new LoggerConfiguration()
+            .MinimumLevel.Debug()
+            .WriteTo.File("governorStatsOutput.log")
+            .CreateLogger();
 
-            var loggerFactory = LoggerFactory.Create(builder =>
-            {
-                builder.AddSerilog();
-            });
+        var loggerFactory = LoggerFactory.Create(builder =>
+        {
+            builder.AddSerilog();
+        });
 
-            // create logger for test data
-            Logger = loggerFactory.CreateLogger("testLogger");
+        // create logger for test data
+        Logger = loggerFactory.CreateLogger("testLogger");
 #else
-            Logger = NullLogger.Instance;
+        Logger = NullLogger.Instance;
 #endif
-        }
     }
-    public class IBTPlaybackGovernor : IClassFixture<LogFixture>
+}
+public class IBTPlaybackGovernor : IClassFixture<LogFixture>
+{
+    Microsoft.Extensions.Logging.ILogger _logger;
+    public IBTPlaybackGovernor(LogFixture logFixture)
     {
-        Microsoft.Extensions.Logging.ILogger _logger;
-        public IBTPlaybackGovernor(LogFixture logFixture)
+        _logger = logFixture.Logger;
+    }
+    public static TheoryData<int, int> Data =>
+        new TheoryData<int, int>
         {
-            _logger = logFixture.Logger;
-        }
-        public static TheoryData<int, int> Data =>
-            new TheoryData<int, int>
-            {
-                    {  1, 5},
-                    { 10, 5},
-                    {1000, 5}
-            };
+                {  1, 5},
+                { 10, 5},
+                {1000, 5}
+        };
 
-        [Theory]
-        [Trait("Category", "manual")]
-        [MemberData(nameof(Data))]
-        public async Task GovernorTests(int speedMultiplier, int secsOfDataToSimulate)
+    [Theory]
+    [Trait("Category", "manual")]
+    [MemberData(nameof(Data))]
+    public async Task GovernorTests(int speedMultiplier, int secsOfDataToSimulate)
+    {
+        var recsToProcess = speedMultiplier * secsOfDataToSimulate * 60;  // 60 records per second
+
+        IPlaybackGovernor g = new SimpleGovernor(_logger, speedMultiplier);
+        g.StartPlayback();
+
+        var sw = new Stopwatch();
+        sw.Start();
+        for (int i = 0; i < recsToProcess; i++)
         {
-            var recsToProcess = speedMultiplier * secsOfDataToSimulate * 60;  // 60 records per second
-
-            IPlaybackGovernor g = new SimpleGovernor(_logger, speedMultiplier);
-            g.StartPlayback();
-
-            var sw = new Stopwatch();
-            sw.Start();
-            for (int i = 0; i < recsToProcess; i++)
-            {
-                await g.GovernSpeed(i);
-            }
-            sw.Stop();
-
-            // differential
-            var elapsedSeconds = sw.ElapsedMilliseconds / 1000d;
-            var timeDiffInSeconds = Math.Abs(secsOfDataToSimulate - elapsedSeconds);
-
-            // we should be time accurate within 1 second at the end of the run
-            Assert.True(timeDiffInSeconds < 1);
+            await g.GovernSpeed(i);
         }
+        sw.Stop();
+
+        // differential
+        var elapsedSeconds = sw.ElapsedMilliseconds / 1000d;
+        var timeDiffInSeconds = Math.Abs(secsOfDataToSimulate - elapsedSeconds);
+
+        // we should be time accurate within 1 second at the end of the run
+        Assert.True(timeDiffInSeconds < 1);
     }
 }
 

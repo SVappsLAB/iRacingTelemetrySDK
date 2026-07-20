@@ -17,104 +17,102 @@
 using Microsoft.Extensions.Logging;
 using SVappsLAB.iRacingTelemetrySDK;
 
-namespace DumpVariables_DumpSessionInfo
+namespace DumpVariables_DumpSessionInfo;
+[RequiredTelemetryVars([TelemetryVar.RPM])]
+internal class Program
 {
-    [RequiredTelemetryVars([TelemetryVar.RPM])]
-    internal class Program
+
+    static async Task Main(string[] args)
     {
+        string timeStamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+        string VARIABLES_FILENAME = $"iRacingVariables-{timeStamp}.csv";
+        string SESSIONINFO_FILENAME = $"IRacingSessionInfo-{timeStamp}.yaml";
+        // amount of time to wait for data before giving up
+        const int WAIT_FOR_DATA_SECS = 30;
 
-        static async Task Main(string[] args)
+        IEnumerable<TelemetryVariable>? telemetryVariables = null;
+        string? rawSessionInfoYaml = null;
+
+        // if you pass in a IBT filename, we'll use that, otherwise default to LIVE mode
+        var ibtOptions = args.Length == 1 ? new IBTOptions(args[0]) : null;
+
+        var logger = LoggerFactory
+                .Create(builder => builder
+                .SetMinimumLevel(LogLevel.Debug)
+                .AddConsole())
+                .CreateLogger("logger");
+
+        logger.LogInformation("pulling data from \'{source}\'", ibtOptions != null ? "IBT file session" : "Live iRacing session");
+
+        // create telemetry client
+        await using var tc = TelemetryClient<TelemetryData>.Create(logger, ibtOptions);
+
+        // give up if we don't receive the session info in time
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(WAIT_FOR_DATA_SECS));
+
+        // collect the session info and variables list from the first session info update, then exit
+        var handlers = new TelemetryHandlers<TelemetryData>
         {
-            string timeStamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
-            string VARIABLES_FILENAME = $"iRacingVariables-{timeStamp}.csv";
-            string SESSIONINFO_FILENAME = $"IRacingSessionInfo-{timeStamp}.yaml";
-            // amount of time to wait for data before giving up
-            const int WAIT_FOR_DATA_SECS = 30;
-
-            IEnumerable<TelemetryVariable>? telemetryVariables = null;
-            string? rawSessionInfoYaml = null;
-
-            // if you pass in a IBT filename, we'll use that, otherwise default to LIVE mode
-            var ibtOptions = args.Length == 1 ? new IBTOptions(args[0]) : null;
-
-            var logger = LoggerFactory
-                    .Create(builder => builder
-                    .SetMinimumLevel(LogLevel.Debug)
-                    .AddConsole())
-                    .CreateLogger("logger");
-
-            logger.LogInformation("pulling data from \'{source}\'", ibtOptions != null ? "IBT file session" : "Live iRacing session");
-
-            // create telemetry client
-            await using var tc = TelemetryClient<TelemetryData>.Create(logger, ibtOptions);
-
-            // give up if we don't receive the session info in time
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(WAIT_FOR_DATA_SECS));
-
-            // collect the session info and variables list from the first session info update, then exit
-            var handlers = new TelemetryHandlers<TelemetryData>
+            OnRawSessionInfoUpdate = rawYaml =>
             {
-                OnRawSessionInfoUpdate = rawYaml =>
-                {
-                    rawSessionInfoYaml = rawYaml;
+                rawSessionInfoYaml = rawYaml;
 
-                    // the variables list is available once we're connected, which is true by the
-                    // time session info arrives. note: GetTelemetryVariables() is synchronous
-                    telemetryVariables = tc.GetTelemetryVariables();
+                // the variables list is available once we're connected, which is true by the
+                // time session info arrives. note: GetTelemetryVariables() is synchronous
+                telemetryVariables = tc.GetTelemetryVariables();
 
-                    // we have everything we need, so stop monitoring
-                    cts.Cancel();
-                    return Task.CompletedTask;
-                }
-            };
-
-            // start monitoring - returns when we cancel (data received) or the timeout elapses
-            await tc.Monitor(handlers, cts.Token);
-
-            // if we have data, save it
-            if (telemetryVariables != null && rawSessionInfoYaml != null)
-            {
-                // save telemetryVariables to file
-                writeVariablesFile(telemetryVariables);
-
-                // save sessionInfo yaml to file
-                writeSessionInfoFile(rawSessionInfoYaml);
-
-                logger.LogInformation("Done. Status: successful");
+                // we have everything we need, so stop monitoring
+                cts.Cancel();
+                return Task.CompletedTask;
             }
-            else
-            {
-                logger.LogWarning("Done. Status: timeout - no session info received within {secs} secs", WAIT_FOR_DATA_SECS);
-            }
+        };
 
+        // start monitoring - returns when we cancel (data received) or the timeout elapses
+        await tc.Monitor(handlers, cts.Token);
 
-            void writeVariablesFile(IEnumerable<TelemetryVariable> variables)
-            {
-                // open telemetryVariables file and write
-                using (var writer = new StreamWriter(VARIABLES_FILENAME))
-                {
-                    // header
-                    writer.WriteLine("name,type,length,isTimeValue,desc,units");
+        // if we have data, save it
+        if (telemetryVariables != null && rawSessionInfoYaml != null)
+        {
+            // save telemetryVariables to file
+            writeVariablesFile(telemetryVariables);
 
-                    // data
-                    foreach (var v in variables)
-                    {
-                        var line = $"{v.Name},{v.Type.Name},{v.Length},{v.IsTimeValue},{v.Desc},{v.Units}";
-                        writer.WriteLine(line);
-                    }
-                }
-                logger.LogInformation("telemetry variables saved to \"{filename}\"", VARIABLES_FILENAME);
-            }
-            void writeSessionInfoFile(string sessionInfoYaml)
-            {
-                // open sessionInfo file and write
-                using (var writer = new StreamWriter(SESSIONINFO_FILENAME))
-                {
-                    writer.WriteLine(sessionInfoYaml);
-                }
-                logger.LogInformation("raw sessionInfo yml saved to \"{filename}\"", SESSIONINFO_FILENAME);
-            }
+            // save sessionInfo yaml to file
+            writeSessionInfoFile(rawSessionInfoYaml);
+
+            logger.LogInformation("Done. Status: successful");
+        }
+        else
+        {
+            logger.LogWarning("Done. Status: timeout - no session info received within {secs} secs", WAIT_FOR_DATA_SECS);
         }
 
+
+        void writeVariablesFile(IEnumerable<TelemetryVariable> variables)
+        {
+            // open telemetryVariables file and write
+            using (var writer = new StreamWriter(VARIABLES_FILENAME))
+            {
+                // header
+                writer.WriteLine("name,type,length,isTimeValue,desc,units");
+
+                // data
+                foreach (var v in variables)
+                {
+                    var line = $"{v.Name},{v.Type.Name},{v.Length},{v.IsTimeValue},{v.Desc},{v.Units}";
+                    writer.WriteLine(line);
+                }
+            }
+            logger.LogInformation("telemetry variables saved to \"{filename}\"", VARIABLES_FILENAME);
+        }
+        void writeSessionInfoFile(string sessionInfoYaml)
+        {
+            // open sessionInfo file and write
+            using (var writer = new StreamWriter(SESSIONINFO_FILENAME))
+            {
+                writer.WriteLine(sessionInfoYaml);
+            }
+            logger.LogInformation("raw sessionInfo yml saved to \"{filename}\"", SESSIONINFO_FILENAME);
+        }
     }
+
 }

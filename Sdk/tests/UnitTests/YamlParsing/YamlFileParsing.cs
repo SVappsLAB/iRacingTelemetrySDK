@@ -17,35 +17,34 @@
 using SVappsLAB.iRacingTelemetrySDK;
 using SVappsLAB.iRacingTelemetrySDK.YamlParsing;
 
-namespace UnitTests.YamlParsing
+namespace UnitTests.YamlParsing;
+
+public class YamlFileParsing
 {
-    public class YamlFileParsing
+    private readonly ITestOutputHelper _output;
+    public YamlFileParsing(ITestOutputHelper output) => _output = output;
+
+    [Fact]
+    public void ParseYaml_ValidFile_ParsesOnFirstAttempt()
     {
-        private readonly ITestOutputHelper _output;
-        public YamlFileParsing(ITestOutputHelper output) => _output = output;
+        var parser = new YamlParser(new XunitLogger(_output));
+        var yaml = File.ReadAllText(@"data/valid.yaml");
 
-        [Fact]
-        public void ParseYaml_ValidFile_ParsesOnFirstAttempt()
-        {
-            var parser = new YamlParser(new XunitLogger(_output));
-            var yaml = File.ReadAllText(@"data/valid.yaml");
+        var result = parser.Parse<TelemetrySessionInfo>(yaml);
 
-            var result = parser.Parse<TelemetrySessionInfo>(yaml);
+        Assert.NotNull(result.Model);
+        Assert.Equal(1, result.ParseAttemptsRequired);
+    }
 
-            Assert.NotNull(result.Model);
-            Assert.Equal(1, result.ParseAttemptsRequired);
-        }
+    [Fact]
+    public void ParseYaml_InvalidFile_ParsesOnSecondAttempt()
+    {
+        var parser = new YamlParser(new XunitLogger(_output));
+        var yaml = File.ReadAllText(@"data/invalid-unescapedChars.yaml");
 
-        [Fact]
-        public void ParseYaml_InvalidFile_ParsesOnSecondAttempt()
-        {
-            var parser = new YamlParser(new XunitLogger(_output));
-            var yaml = File.ReadAllText(@"data/invalid-unescapedChars.yaml");
+        var result = parser.Parse<TelemetrySessionInfo>(yaml);
 
-            var result = parser.Parse<TelemetrySessionInfo>(yaml);
-
-            Assert.NotNull(result.Model);
-            Assert.Equal(2, result.ParseAttemptsRequired);
-        }
+        Assert.NotNull(result.Model);
+        Assert.Equal(2, result.ParseAttemptsRequired);
     }
 }

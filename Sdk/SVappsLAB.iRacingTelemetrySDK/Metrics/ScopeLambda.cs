@@ -16,18 +16,17 @@
 
 using System;
 
-namespace SVappsLAB.iRacingTelemetrySDK.Metrics
+namespace SVappsLAB.iRacingTelemetrySDK.Metrics;
+
+internal class ScopeLambda : IDisposable
 {
-    internal class ScopeLambda : IDisposable
+    readonly Action _lambda;
+    public ScopeLambda(Action lambda)
     {
-        readonly Action _lambda;
-        public ScopeLambda(Action lambda)
-        {
-            _lambda = lambda;
-        }
-        public void Dispose()
-        {
-            _lambda();
-        }
+        _lambda = lambda;
+    }
+    public void Dispose()
+    {
+        _lambda();
     }
 }

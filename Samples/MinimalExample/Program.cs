@@ -17,60 +17,58 @@
 using Microsoft.Extensions.Logging;
 using SVappsLAB.iRacingTelemetrySDK;
 
-namespace MinimalExample
+namespace MinimalExample;
+// 1. Define the telemetry variables you want to track
+[RequiredTelemetryVars([TelemetryVar.Speed, TelemetryVar.RPM])]
+internal class Program
 {
-    // 1. Define the telemetry variables you want to track
-    [RequiredTelemetryVars([TelemetryVar.Speed, TelemetryVar.RPM])]
-    internal class Program
+    public static async Task Main(string[] args)
     {
-        public static async Task Main(string[] args)
+        // 2. Create logger
+        var logger = LoggerFactory.Create(builder => builder.AddConsole())
+                                  .CreateLogger("MinimalExample");
+
+        // 3. Choose data source
+        IBTOptions? ibtOptions = null;  // null for live telemetry from iRacing
+                                        // = new IBTOptions("gt3_spa.ibt");  IBT filepath for file playback
+        ibtOptions = new IBTOptions(args[0]);
+
+        // 4. Create telemetry client
+        await using var client = TelemetryClient<TelemetryData>.Create(logger, ibtOptions);
+
+        // 5. Use cancellation token for proper shutdown
+        using var cts = new CancellationTokenSource();
+
+        // 6. Enable graceful shutdown with Ctrl+C
+        Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
+
+        // 7. Define handlers
+        var handlers = new TelemetryHandlers<TelemetryData>
         {
-            // 2. Create logger
-            var logger = LoggerFactory.Create(builder => builder.AddConsole())
-                                      .CreateLogger("MinimalExample");
-
-            // 3. Choose data source
-            IBTOptions? ibtOptions = null;  // null for live telemetry from iRacing
-                                            // = new IBTOptions("gt3_spa.ibt");  IBT filepath for file playback
-            ibtOptions = new IBTOptions(args[0]);
-
-            // 4. Create telemetry client
-            await using var client = TelemetryClient<TelemetryData>.Create(logger, ibtOptions);
-
-            // 5. Use cancellation token for proper shutdown
-            using var cts = new CancellationTokenSource();
-
-            // 6. Enable graceful shutdown with Ctrl+C
-            Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
-
-            // 7. Define handlers
-            var handlers = new TelemetryHandlers<TelemetryData>
+            OnTelemetryUpdate = telemetryData =>
             {
-                OnTelemetryUpdate = telemetryData =>
-                {
-                    Console.WriteLine($"Speed: {telemetryData.Speed}, RPM: {telemetryData.RPM}");
-                    return Task.CompletedTask;
-                },
-                OnSessionInfoUpdate = session =>
-                {
-                    var driverCount = session.DriverInfo?.Drivers?.Count ?? 0;
-                    Console.WriteLine($"Drivers: {driverCount}");
-                    return Task.CompletedTask;
-                },
-                OnConnectStateChanged = state =>
-                {
-                    Console.WriteLine($"Connection: {state}");
-                    return Task.CompletedTask;
-                },
-                OnError = error =>
-                {
-                    Console.WriteLine($"Error: {error.Message}");
-                    return Task.CompletedTask;
-                }
-            };
+                Console.WriteLine($"Speed: {telemetryData.Speed}, RPM: {telemetryData.RPM}");
+                return Task.CompletedTask;
+            },
+            OnSessionInfoUpdate = session =>
+            {
+                var driverCount = session.DriverInfo?.Drivers?.Count ?? 0;
+                Console.WriteLine($"Drivers: {driverCount}");
+                return Task.CompletedTask;
+            },
+            OnConnectStateChanged = state =>
+            {
+                Console.WriteLine($"Connection: {state}");
+                return Task.CompletedTask;
+            },
+            OnError = error =>
+            {
+                Console.WriteLine($"Error: {error.Message}");
+                return Task.CompletedTask;
+            }
+        };
 
-            // 8. Monitor telemetry data stream until cancellation
-            await client.Monitor(handlers, cts.Token);
-        }
+        // 8. Monitor telemetry data stream until cancellation
+        await client.Monitor(handlers, cts.Token);
     }
 }

@@ -2,7 +2,7 @@
 
 This folder contains a number of example projects showing ways to use the SDK
 
-All of these examples can be used with a running 'live' instance of iRacing, or with a previously saved IBT file.
+All of these examples can be used with a running 'live' instance of iRacing, or with a previously saved IBT file (except [SimControl](./SimControl/), which controls the simulator and therefore requires a live instance).
 
 All samples define a `TelemetryHandlers<TelemetryData>` variable and pass it to `Monitor(handlers, ct)` for telemetry consumption. For setup and basic usage see the [main README](../README.md); for direct stream access and other advanced patterns see [Advanced Usage](../docs/ADVANCED.md).
 
@@ -21,6 +21,10 @@ All samples define a `TelemetryHandlers<TelemetryData>` variable and pass it to 
 * [LocationAndWarnings](./LocationAndWarnings/)
 
     Shows the use of the bitfield `Flags` and the `Enumerations` iRacing provides, describing the state of the car engine and the track surface.
+
+* [SimControl](./SimControl/)
+
+    Interactive keyboard demo for remote-controlling the simulator via `client.SimControl`. Pick a command category (cameras, replay, pit service, chat, telemetry recording, video capture, force feedback, textures), then fire individual commands and watch the effect in the simulator. Requires a live iRacing session.
 
 * [SpeedRPMGear](./SpeedRPMGear/)
 

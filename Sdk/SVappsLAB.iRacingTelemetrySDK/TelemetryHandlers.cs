@@ -17,46 +17,45 @@
 using System;
 using System.Threading.Tasks;
 
-namespace SVappsLAB.iRacingTelemetrySDK
+namespace SVappsLAB.iRacingTelemetrySDK;
+
+/// <summary>
+/// Callback handlers used by <see cref="ITelemetryClient{T}.Monitor(TelemetryHandlers{T}, System.Threading.CancellationToken)"/>.
+/// </summary>
+/// <typeparam name="T">The telemetry data type.</typeparam>
+/// <remarks>
+/// Handlers are awaited sequentially per stream. Keep handlers fast, especially
+/// <see cref="OnTelemetryUpdate"/>, which can run at 60Hz. Queue expensive work to
+/// application-owned background processing when needed.
+/// </remarks>
+public sealed class TelemetryHandlers<T> where T : struct
 {
     /// <summary>
-    /// Callback handlers used by <see cref="ITelemetryClient{T}.Monitor(TelemetryHandlers{T}, System.Threading.CancellationToken)"/>.
+    /// Called when a telemetry data update is available.
     /// </summary>
-    /// <typeparam name="T">The telemetry data type.</typeparam>
+    public Func<T, Task>? OnTelemetryUpdate { get; init; }
+
+    /// <summary>
+    /// Called when parsed session information is available.
+    /// </summary>
+    public Func<TelemetrySessionInfo, Task>? OnSessionInfoUpdate { get; init; }
+
+    /// <summary>
+    /// Called when raw YAML session information is available.
+    /// </summary>
+    public Func<string, Task>? OnRawSessionInfoUpdate { get; init; }
+
+    /// <summary>
+    /// Called when the telemetry source connection state changes.
+    /// </summary>
+    public Func<ConnectState, Task>? OnConnectStateChanged { get; init; }
+
+    /// <summary>
+    /// Called when the SDK publishes a telemetry processing error.
+    /// </summary>
     /// <remarks>
-    /// Handlers are awaited sequentially per stream. Keep handlers fast, especially
-    /// <see cref="OnTelemetryUpdate"/>, which can run at 60Hz. Queue expensive work to
-    /// application-owned background processing when needed.
+    /// Exceptions thrown by user handlers are not routed here. Handler exceptions
+    /// fault the <c>Monitor(...)</c> call directly.
     /// </remarks>
-    public sealed class TelemetryHandlers<T> where T : struct
-    {
-        /// <summary>
-        /// Called when a telemetry data update is available.
-        /// </summary>
-        public Func<T, Task>? OnTelemetryUpdate { get; init; }
-
-        /// <summary>
-        /// Called when parsed session information is available.
-        /// </summary>
-        public Func<TelemetrySessionInfo, Task>? OnSessionInfoUpdate { get; init; }
-
-        /// <summary>
-        /// Called when raw YAML session information is available.
-        /// </summary>
-        public Func<string, Task>? OnRawSessionInfoUpdate { get; init; }
-
-        /// <summary>
-        /// Called when the telemetry source connection state changes.
-        /// </summary>
-        public Func<ConnectState, Task>? OnConnectStateChanged { get; init; }
-
-        /// <summary>
-        /// Called when the SDK publishes a telemetry processing error.
-        /// </summary>
-        /// <remarks>
-        /// Exceptions thrown by user handlers are not routed here. Handler exceptions
-        /// fault the <c>Monitor(...)</c> call directly.
-        /// </remarks>
-        public Func<Exception, Task>? OnError { get; init; }
-    }
+    public Func<Exception, Task>? OnError { get; init; }
 }

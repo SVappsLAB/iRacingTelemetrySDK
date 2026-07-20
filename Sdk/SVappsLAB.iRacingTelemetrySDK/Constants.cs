@@ -14,10 +14,9 @@
  * limitations under the License.
 **/
 
-namespace SVappsLAB.iRacingTelemetrySDK
+namespace SVappsLAB.iRacingTelemetrySDK;
+
+internal static class Constants
 {
-    internal static class Constants
-    {
-        public const string SDK_NAME = "SVappsLAB.iRacingTelemetrySDK";
-    }
+    public const string SDK_NAME = "SVappsLAB.iRacingTelemetrySDK";
 }

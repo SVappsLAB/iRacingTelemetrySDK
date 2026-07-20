@@ -16,17 +16,17 @@
 
 using SVappsLAB.iRacingTelemetrySDK.YamlParsing;
 
-namespace UnitTests.YamlParsing
-{
-    public class YamlStrategyTests
-    {
-        private readonly QuoteValuesYamlPreparationStrategy _quoteStrategy = new();
+namespace UnitTests.YamlParsing;
 
-        [Fact]
-        public void NoOp_LeavesValuesUnchanged()
-        {
-            var strategy = new NoOpYamlPreparationStrategy();
-            var src =
+public class YamlStrategyTests
+{
+    private readonly QuoteValuesYamlPreparationStrategy _quoteStrategy = new();
+
+    [Fact]
+    public void NoOp_LeavesValuesUnchanged()
+    {
+        var strategy = new NoOpYamlPreparationStrategy();
+        var src =
 @"
  DriverInfo:
   DriverSetupName: x.sto
@@ -35,33 +35,33 @@ namespace UnitTests.YamlParsing
       UserName: myName
 ";
 
-            var result = strategy.Prepare(src);
+        var result = strategy.Prepare(src);
 
-            Assert.Multiple(
-                () => Assert.Contains("DriverSetupName: x.sto", result),
-                () => Assert.Contains("UserName: myName", result)
-            );
-        }
+        Assert.Multiple(
+            () => Assert.Contains("DriverSetupName: x.sto", result),
+            () => Assert.Contains("UserName: myName", result)
+        );
+    }
 
-        [Theory]
-        [InlineData("  DriverSetupName: - x.sto", "DriverSetupName: '- x.sto'")]
-        [InlineData("  UserName: `myName`", "UserName: '`myName`'")]
-        [InlineData("  AbbrevName: $", "AbbrevName: '$'")]
-        [InlineData("  Initials: [", "Initials: '['")]
-        [InlineData("  TeamName: @ALL", "TeamName: '@ALL'")]
-        [InlineData("  UserName: O'Neil", "UserName: 'O''Neil'")]
-        [InlineData("     CameraName: TV1 (Director)", "CameraName: 'TV1 (Director)'")]
-        public void QuoteValues_QuotesProblematicValues(string inputLine, string expectedOutput)
-        {
-            var result = _quoteStrategy.Prepare(inputLine);
+    [Theory]
+    [InlineData("  DriverSetupName: - x.sto", "DriverSetupName: '- x.sto'")]
+    [InlineData("  UserName: `myName`", "UserName: '`myName`'")]
+    [InlineData("  AbbrevName: $", "AbbrevName: '$'")]
+    [InlineData("  Initials: [", "Initials: '['")]
+    [InlineData("  TeamName: @ALL", "TeamName: '@ALL'")]
+    [InlineData("  UserName: O'Neil", "UserName: 'O''Neil'")]
+    [InlineData("     CameraName: TV1 (Director)", "CameraName: 'TV1 (Director)'")]
+    public void QuoteValues_QuotesProblematicValues(string inputLine, string expectedOutput)
+    {
+        var result = _quoteStrategy.Prepare(inputLine);
 
-            Assert.Contains(expectedOutput, result);
-        }
+        Assert.Contains(expectedOutput, result);
+    }
 
-        [Fact]
-        public void QuoteValues_LeavesAlreadyQuotedValuesUnchanged()
-        {
-            var src =
+    [Fact]
+    public void QuoteValues_LeavesAlreadyQuotedValuesUnchanged()
+    {
+        var src =
 @"
 DriverInfo:
   Drivers:
@@ -70,13 +70,12 @@ DriverInfo:
       TeamName: ""Already Double""
 ";
 
-            var result = _quoteStrategy.Prepare(src);
+        var result = _quoteStrategy.Prepare(src);
 
-            Assert.Multiple(
-                () => Assert.Contains("UserName: 'Already Single'", result),
-                () => Assert.Contains("TeamName: \"Already Double\"", result),
-                () => Assert.DoesNotContain("''Already Single''", result)
-            );
-        }
+        Assert.Multiple(
+            () => Assert.Contains("UserName: 'Already Single'", result),
+            () => Assert.Contains("TeamName: \"Already Double\"", result),
+            () => Assert.DoesNotContain("''Already Single''", result)
+        );
     }
 }

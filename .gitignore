@@ -1,6 +1,5 @@
 *.user
 .vs
-Samples/**/.ai/
 artifacts/
 bin/
 dist/

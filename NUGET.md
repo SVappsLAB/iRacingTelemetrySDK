@@ -11,6 +11,7 @@ High-performance .NET SDK for accessing **live telemetry data** from iRacing sim
 - **Live Telemetry**: Real-time access to speed, RPM, tire data, and 200+ variables during iRacing sessions
 - **IBT File Support**: Cross-platform playback of historical telemetry using the same strongly-typed API
 - **Robust Buffering**: 60-sample ring buffer (1 second at 60Hz) ensures reliable data delivery even when your app can't keep pace
+- **Simulator Control**: Send commands *to* the simulator - cameras, replay, pit service, chat, telemetry recording, and more
 
 ## Architecture Benefits
 
@@ -30,6 +31,7 @@ Perfect for building:
 - **Data Analysis Tools** - Analyze racing performance from IBT files
 - **Race Engineering Apps** - Track tire wear, fuel consumption, lap times
 - **Telemetry Visualizations** - Create charts and graphs from historical data
+- **Broadcast & Spectator Tools** - Switch cameras and drive replay playback remotely
 
 
 ## Support for AI-Assisted Development
@@ -111,6 +113,26 @@ public class Program
     }
 }
 ```
+
+## Controlling the Simulator
+
+In addition to reading telemetry, the SDK can send commands *to* the simulator via the client's `SimControl` property. Commands are grouped by feature area (`Camera`, `Replay`, `Pit`, `Chat`, `TelemetryRecording`, `VideoCapture`, `ForceFeedback`, `Textures`) and are fire-and-forget — they return immediately and are ignored if iRacing is not running.
+
+```csharp
+using SVappsLAB.iRacingTelemetrySDK.SimControl;
+
+var sim = client.SimControl;
+
+// pit service (only while in the car)
+sim.Pit.AddFuel(30);
+sim.Pit.RequestFastRepair();
+
+// replay and cameras (only while out of the car)
+sim.Replay.Search(ReplaySearchMode.NextIncident);
+sim.Camera.SwitchToPosition(CameraFocus.AtLeader, cameraGroup: 1, camera: 1);
+```
+
+See the [SimControl sample](https://github.com/SVappsLAB/iRacingTelemetrySDK/tree/main/Samples/SimControl) for an interactive demo covering all command groups.
 
 ## Requirements
 

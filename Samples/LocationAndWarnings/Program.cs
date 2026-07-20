@@ -17,91 +17,89 @@
 using Microsoft.Extensions.Logging;
 using SVappsLAB.iRacingTelemetrySDK;
 
-namespace LocationAndWarnings
+namespace LocationAndWarnings;
+
+// these are the telemetry variables we want to track
+[RequiredTelemetryVars([
+    TelemetryVar.EngineWarnings,
+    TelemetryVar.IsOnTrack,
+    TelemetryVar.PlayerTrackSurface,
+    TelemetryVar.PlayerTrackSurfaceMaterial
+    ])]
+internal class Program
 {
-
-    // these are the telemetry variables we want to track
-    [RequiredTelemetryVars([
-        TelemetryVar.EngineWarnings,
-        TelemetryVar.IsOnTrack,
-        TelemetryVar.PlayerTrackSurface,
-        TelemetryVar.PlayerTrackSurfaceMaterial
-        ])]
-    internal class Program
+    // pass the IBT file you want to analyze
+    public static async Task Main(string[] args)
     {
-        // pass the IBT file you want to analyze
-        public static async Task Main(string[] args)
+        var counter = 0;
+        var logger = LoggerFactory
+                .Create(builder => builder
+                .SetMinimumLevel(LogLevel.Debug)
+                .AddConsole())
+                .CreateLogger("logger");
+
+        IBTOptions? ibtOptions = null;
+        if (args.Length == 1)
+            ibtOptions = new IBTOptions(args[0]);
+
+        logger.LogInformation("processing data from \"{source}\"", ibtOptions == null ? "online LIVE session" : "offline IBT file");
+
+        // create telemetry client
+        await using var tc = TelemetryClient<TelemetryData>.Create(logger, ibtOptions);
+
+        // use cancellation token for proper shutdown
+        using var cts = new CancellationTokenSource();
+
+        Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
+
+        // start monitoring telemetry - press ctrl-c to exit
+        var handlers = new TelemetryHandlers<TelemetryData>
         {
-            var counter = 0;
-            var logger = LoggerFactory
-                    .Create(builder => builder
-                    .SetMinimumLevel(LogLevel.Debug)
-                    .AddConsole())
-                    .CreateLogger("logger");
-
-            IBTOptions? ibtOptions = null;
-            if (args.Length == 1)
-                ibtOptions = new IBTOptions(args[0]);
-
-            logger.LogInformation("processing data from \"{source}\"", ibtOptions == null ? "online LIVE session" : "offline IBT file");
-
-            // create telemetry client
-            await using var tc = TelemetryClient<TelemetryData>.Create(logger, ibtOptions);
-
-            // use cancellation token for proper shutdown
-            using var cts = new CancellationTokenSource();
-
-            Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
-
-            // start monitoring telemetry - press ctrl-c to exit
-            var handlers = new TelemetryHandlers<TelemetryData>
+            OnTelemetryUpdate = data =>
             {
-                OnTelemetryUpdate = data =>
-                {
-                    OnTelemetryUpdate(data);
-                    return Task.CompletedTask;
-                }
-            };
-
-            await tc.Monitor(handlers, cts.Token);
-            logger.LogInformation("done");
-
-
-            void OnTelemetryUpdate(TelemetryData e)
-            {
-                // slow things down, only output information every 2 seconds
-                if ((counter++ % (2 * 60f)) != 0)
-                    return;
-
-                // figure out where the car is, and what the track surface is
-                var trackSurface = e.PlayerTrackSurface.ToString();
-                var trackSurfaceMaterial = e.PlayerTrackSurfaceMaterial.ToString();
-
-                // engine warnings
-                var engineWarnings = GetEngineWarnings(e.EngineWarnings);
-
-                var message = $"OnTrack:({e.IsOnTrack}), TrackSurface:({trackSurface}), TrackSurfaceMaterial:({trackSurfaceMaterial}), EngineWarnings:({engineWarnings})";
-                logger.LogInformation(message);
+                OnTelemetryUpdate(data);
+                return Task.CompletedTask;
             }
+        };
 
-            string GetEngineWarnings(EngineWarnings? engineWarnings)
+        await tc.Monitor(handlers, cts.Token);
+        logger.LogInformation("done");
+
+
+        void OnTelemetryUpdate(TelemetryData e)
+        {
+            // slow things down, only output information every 2 seconds
+            if ((counter++ % (2 * 60f)) != 0)
+                return;
+
+            // figure out where the car is, and what the track surface is
+            var trackSurface = e.PlayerTrackSurface.ToString();
+            var trackSurfaceMaterial = e.PlayerTrackSurfaceMaterial.ToString();
+
+            // engine warnings
+            var engineWarnings = GetEngineWarnings(e.EngineWarnings);
+
+            var message = $"OnTrack:({e.IsOnTrack}), TrackSurface:({trackSurface}), TrackSurfaceMaterial:({trackSurfaceMaterial}), EngineWarnings:({engineWarnings})";
+            logger.LogInformation(message);
+        }
+
+        string GetEngineWarnings(EngineWarnings? engineWarnings)
+        {
+            var warnings = new List<string>();
+            if (engineWarnings.HasValue)
             {
-                var warnings = new List<string>();
-                if (engineWarnings.HasValue)
+                foreach (var flag in Enum.GetValues<EngineWarnings>())
                 {
-                    foreach (var flag in Enum.GetValues<EngineWarnings>())
+                    // check if the flag is set
+                    if ((engineWarnings.Value & flag) == flag)
                     {
-                        // check if the flag is set
-                        if ((engineWarnings.Value & flag) == flag)
-                        {
-                            var flagName = flag.ToString();
-                            if (!string.IsNullOrEmpty(flagName))
-                                warnings.Add(flagName);
-                        }
+                        var flagName = flag.ToString();
+                        if (!string.IsNullOrEmpty(flagName))
+                            warnings.Add(flagName);
                     }
                 }
-                return string.Join(",", warnings);
             }
+            return string.Join(",", warnings);
         }
     }
 }

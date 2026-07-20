@@ -16,54 +16,53 @@
 
 using System.Text.RegularExpressions;
 
-namespace SVappsLAB.iRacingTelemetrySDK.YamlParsing
+namespace SVappsLAB.iRacingTelemetrySDK.YamlParsing;
+
+internal abstract class YamlPreparationStrategy
 {
-    internal abstract class YamlPreparationStrategy
-    {
-        public abstract string Name { get; }
-        public abstract string Prepare(string srcYaml);
-    }
+    public abstract string Name { get; }
+    public abstract string Prepare(string srcYaml);
+}
 
-    // this the optimum strategy for well-formed yaml (no-op)
-    // and will be the first option we try
-    internal class NoOpYamlPreparationStrategy : YamlPreparationStrategy
-    {
-        public override string Name => "No-Op";
-        public override string Prepare(string srcYaml) => srcYaml;
-    }
+// this the optimum strategy for well-formed yaml (no-op)
+// and will be the first option we try
+internal class NoOpYamlPreparationStrategy : YamlPreparationStrategy
+{
+    public override string Name => "No-Op";
+    public override string Prepare(string srcYaml) => srcYaml;
+}
 
-    // regex can be slow, but the parsing is running on a separate Task, off the critical path
-    internal partial class QuoteValuesYamlPreparationStrategy : YamlPreparationStrategy
-    {
-        public override string Name => "Quote-Values";
+// regex can be slow, but the parsing is running on a separate Task, off the critical path
+internal partial class QuoteValuesYamlPreparationStrategy : YamlPreparationStrategy
+{
+    public override string Name => "Quote-Values";
 
-        public override string Prepare(string srcYaml)
+    public override string Prepare(string srcYaml)
+    {
+        return KnownStringKeysRegex().Replace(srcYaml, match =>
         {
-            return KnownStringKeysRegex().Replace(srcYaml, match =>
-            {
-                var keyPart = match.Groups[1].Value;
-                var valuePart = match.Groups[2].Value;
+            var keyPart = match.Groups[1].Value;
+            var valuePart = match.Groups[2].Value;
 
-                // preserve trailing \r
-                var hasCR = valuePart.EndsWith('\r');
-                if (hasCR)
-                    valuePart = valuePart[..^1];
+            // preserve trailing \r
+            var hasCR = valuePart.EndsWith('\r');
+            if (hasCR)
+                valuePart = valuePart[..^1];
 
-                var value = valuePart.TrimStart();
+            var value = valuePart.TrimStart();
 
-                // skip already-quoted values
-                if (value.Length >= 2 &&
-                    ((value[0] == '\'' && value[^1] == '\'') ||
-                     (value[0] == '"' && value[^1] == '"')))
-                    return match.Value;
+            // skip already-quoted values
+            if (value.Length >= 2 &&
+                ((value[0] == '\'' && value[^1] == '\'') ||
+                 (value[0] == '"' && value[^1] == '"')))
+                return match.Value;
 
-                // wrap in single quotes, escaping embedded single quotes
-                var escaped = value.Replace("'", "''");
-                return $"{keyPart} '{escaped}'{(hasCR ? "\r" : "")}";
-            });
-        }
-
-        [GeneratedRegex(@"^(\s*(?:AbbrevName|TeamName|UserName|Initials|DriverSetupName|CameraName):)([ \t]+\S.*)$", RegexOptions.Multiline)]
-        private static partial Regex KnownStringKeysRegex();
+            // wrap in single quotes, escaping embedded single quotes
+            var escaped = value.Replace("'", "''");
+            return $"{keyPart} '{escaped}'{(hasCR ? "\r" : "")}";
+        });
     }
+
+    [GeneratedRegex(@"^(\s*(?:AbbrevName|TeamName|UserName|Initials|DriverSetupName|CameraName):)([ \t]+\S.*)$", RegexOptions.Multiline)]
+    private static partial Regex KnownStringKeysRegex();
 }

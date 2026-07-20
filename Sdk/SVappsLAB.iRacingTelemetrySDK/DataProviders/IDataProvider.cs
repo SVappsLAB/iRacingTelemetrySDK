@@ -20,57 +20,56 @@ using System.Threading;
 using System.Threading.Tasks;
 using SVappsLAB.iRacingTelemetrySDK.irSDKDefines;
 
-namespace SVappsLAB.iRacingTelemetrySDK.DataProviders
+namespace SVappsLAB.iRacingTelemetrySDK.DataProviders;
+
+internal interface IDataProvider : IAsyncDisposable
 {
-    internal interface IDataProvider : IAsyncDisposable
-    {
-        void OpenDataSource();
-        /// <summary>
-        /// Gets a value indicating whether a connection to the data source is established.
-        /// </summary>
-        bool IsConnected { get; }
+    void OpenDataSource();
+    /// <summary>
+    /// Gets a value indicating whether a connection to the data source is established.
+    /// </summary>
+    bool IsConnected { get; }
 
-        /// <summary>
-        /// Checks if the session information has been updated since the last check.
-        /// </summary>
-        /// <returns>True if session information was updated; otherwise, false.</returns>
-        bool IsSessionInfoUpdated();
+    /// <summary>
+    /// Checks if the session information has been updated since the last check.
+    /// </summary>
+    /// <returns>True if session information was updated; otherwise, false.</returns>
+    bool IsSessionInfoUpdated();
 
-        /// <summary>
-        /// Gets the current iRacing SDK header containing telemetry session metadata.
-        /// </summary>
-        /// <returns>The current iRacing SDK header.</returns>
-        /// <exception cref="InvalidOperationException">Thrown when the data source is not open.</exception>
-        irsdk_header GetHeader();
+    /// <summary>
+    /// Gets the current iRacing SDK header containing telemetry session metadata.
+    /// </summary>
+    /// <returns>The current iRacing SDK header.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when the data source is not open.</exception>
+    irsdk_header GetHeader();
 
-        /// <summary>
-        /// Gets the session information as YAML text.
-        /// </summary>
-        /// <returns>The session information in YAML format, or an empty string if not available.</returns>
-        /// <exception cref="InvalidOperationException">Thrown when the memory view is not acquired.</exception>
-        string GetSessionInfoYaml();
+    /// <summary>
+    /// Gets the session information as YAML text.
+    /// </summary>
+    /// <returns>The session information in YAML format, or an empty string if not available.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when the memory view is not acquired.</exception>
+    string GetSessionInfoYaml();
 
-        /// <summary>
-        /// Gets the dictionary of variable headers that describe available telemetry variables.
-        /// </summary>
-        /// <returns>A dictionary of variable headers, or null if headers are not initialized.</returns>
-        VarHeaderDictionary? GetVarHeaders();
+    /// <summary>
+    /// Gets the dictionary of variable headers that describe available telemetry variables.
+    /// </summary>
+    /// <returns>A dictionary of variable headers, or null if headers are not initialized.</returns>
+    VarHeaderDictionary? GetVarHeaders();
 
-        /// <summary>
-        /// Gets the value of a telemetry variable by name.
-        /// </summary>
-        /// <param name="varName">The name of the variable to retrieve.</param>
-        /// <returns>The value of the variable, which could be a scalar or an array. Returns null if the variable is not found.</returns>
-        /// <exception cref="InvalidOperationException">Thrown when variable headers or telemetry buffer are not initialized.</exception>
-        /// <exception cref="IndexOutOfRangeException">Thrown when the variable's data would exceed buffer boundaries.</exception>
-        object? GetVarValue(string varName);
+    /// <summary>
+    /// Gets the value of a telemetry variable by name.
+    /// </summary>
+    /// <param name="varName">The name of the variable to retrieve.</param>
+    /// <returns>The value of the variable, which could be a scalar or an array. Returns null if the variable is not found.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when variable headers or telemetry buffer are not initialized.</exception>
+    /// <exception cref="IndexOutOfRangeException">Thrown when the variable's data would exceed buffer boundaries.</exception>
+    object? GetVarValue(string varName);
 
-        /// <summary>
-        /// Waits for new telemetry data to become available.
-        /// </summary>
-        /// <param name="timeout">Maximum time to wait for new data.</param>
-        /// <param name="cancellationToken">Cancellation token to cancel the wait operation.</param>
-        /// <returns>True if new data is available; otherwise, false (timeout).</returns>
-        Task<bool> WaitForDataReady(TimeSpan timeout, CancellationToken cancellationToken = default);
-    }
+    /// <summary>
+    /// Waits for new telemetry data to become available.
+    /// </summary>
+    /// <param name="timeout">Maximum time to wait for new data.</param>
+    /// <param name="cancellationToken">Cancellation token to cancel the wait operation.</param>
+    /// <returns>True if new data is available; otherwise, false (timeout).</returns>
+    Task<bool> WaitForDataReady(TimeSpan timeout, CancellationToken cancellationToken = default);
 }

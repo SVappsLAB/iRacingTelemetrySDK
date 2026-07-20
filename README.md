@@ -14,6 +14,7 @@ Perfect for building **real-time dashboards**, **data analysis tools**, **race e
 - [Quick Example](#quick-example)
 - [Getting Started](#getting-started)
 - [Understanding Telemetry Variables](#understanding-telemetry-variables)
+- [Controlling the Simulator](#controlling-the-simulator)
 - [Samples](#samples)
 - [Advanced Usage](./docs/ADVANCED.md)
 - [Documentation](#documentation)
@@ -33,6 +34,7 @@ Perfect for building **real-time dashboards**, **data analysis tools**, **race e
 - **Modern Async API**: Async data streams with automatic backpressure handling
 - **Built-in Metrics**: Integrated performance monitoring via System.Diagnostics.Metrics
 - **Pause and Resume**: Control data flow while background processing continues
+- **Sim Control**: Remotely control the simulator (pit commands, replay, cameras, chat, and more)
 
 ## Requirements
 
@@ -224,11 +226,39 @@ var hasValue = data.Speed.HasValue;
 if (data.IsOnTrackCar == true) { /* ... */ }
 ```
 
+## Controlling the Simulator
+
+In addition to reading telemetry, the SDK can send commands *to* the simulator. Commands are grouped by feature
+area and are fire-and-forget — they return immediately and are ignored if iRacing is not
+running. Commands work independently of monitoring and connection state, though sending while
+iRacing is not connected logs a warning since the command will likely have no effect.
+
+```csharp
+using SVappsLAB.iRacingTelemetrySDK.SimControl;
+
+// get the sim controller from your telemetry client
+var sim = client.SimControl;
+
+// pit service (only while in the car)
+sim.Pit.AddFuel(30);
+sim.Pit.ChangeTire(TireLocation.LeftFront);
+sim.Pit.RequestFastRepair();
+
+// replay control (only while out of the car)
+sim.Replay.Search(ReplaySearchMode.NextIncident);
+sim.Replay.SetPlaySpeed(2);
+
+// cameras
+sim.Camera.SwitchToPosition(CameraFocus.AtLeader, cameraGroup: 1, camera: 1);
+sim.Camera.SwitchToCar("001", cameraGroup: 1, camera: 1);
+```
+
 ## Samples
 
 See [Samples Directory](./Samples/README.md) for ready-to-run example projects including:
 - Basic telemetry monitoring
 - IBT file analysis
+- Simulator control, including cameras, replay, pit service, and broadcast commands
 - Data export utilities
 - Track analysis tools
 

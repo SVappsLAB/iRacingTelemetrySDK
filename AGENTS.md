@@ -6,7 +6,7 @@ For consumer-app usage patterns, read `docs/ai/SDK_USAGE.md` first and `docs/ai/
 
 ## Layout
 
-- `Sdk/SVappsLAB.iRacingTelemetrySDK/` - Core SDK, telemetry client, data providers, models, and YAML parsing.
+- `Sdk/SVappsLAB.iRacingTelemetrySDK/` - Core SDK, telemetry client, data providers, models, YAML parsing, and sim control (win32 broadcast commands).
 - `Sdk/SVappsLAB.iRacingTelemetrySDK.CodeGen/` - Roslyn source generator for strongly typed telemetry records.
 - `Sdk/SVappsLAB.iRacingTelemetrySDK.EnumsAndFlags/` - iRacing telemetry variable enums, flags, and related types.
 - `Sdk/tests/UnitTests/` - Unit tests.
