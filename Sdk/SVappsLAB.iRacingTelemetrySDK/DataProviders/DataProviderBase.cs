@@ -262,9 +262,13 @@ internal abstract unsafe class DataProviderBase : IAsyncDisposable
 
 
     // with IBT files, the 'recNum' tells us which data record in the mmf we should read
+    //
+    // IBT files always have a single buffer, and don't populate 'curBuf' (it is
+    // only written by the sim, for live data). read varBuf[0] directly, rather
+    // than resolving through the live-only field
     protected void CopyNewTelemetryDataToBuffer(int recNum = 0)
     {
-        var offset = _header.GetMostRecentBuffer().bufOffset + recNum * _header.bufLen;
+        var offset = _header.GetVarBuf(0).bufOffset + recNum * _header.bufLen;
         var ros = new ReadOnlySpan<byte>(_dataPtr + offset, _header.bufLen);
         ros.CopyTo(_telemetryDataBuffer);
     }
