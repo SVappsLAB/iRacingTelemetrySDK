@@ -13,6 +13,17 @@ High-performance .NET SDK for accessing **live telemetry data** from iRacing sim
 - **Robust Buffering**: 60-sample ring buffer (1 second at 60Hz) ensures reliable data delivery even when your app can't keep pace
 - **Simulator Control**: Send commands *to* the simulator - cameras, replay, pit service, chat, telemetry recording, and more
 
+## How It Compares
+
+Most .NET iRacing libraries are thin wrappers over the simulator's shared-memory layout — variables looked up by string name at runtime, data delivered through events on the caller's thread. This SDK treats telemetry as a **typed, high-throughput data stream** instead:
+
+- **Compile-time generated structs** instead of runtime string/dictionary lookups — typos are build errors, and only the variables you declare are ever decoded
+- **Async data streams with bounded backpressure** instead of events on the caller's thread — your processing speed never stalls data collection
+- **The same strongly-typed API for live and IBT data**, rather than separate code paths
+- **Built-in metrics** (`System.Diagnostics.Metrics`) so you can see processing rates and dropped records in production
+
+Full comparison and design rationale: [Architecture and Design](https://github.com/SVappsLAB/iRacingTelemetrySDK/blob/main/ARCHITECTURE.md)
+
 ## Architecture Benefits
 
 **Production-Ready Data Streaming:**
@@ -142,6 +153,7 @@ See the [SimControl sample](https://github.com/SVappsLAB/iRacingTelemetrySDK/tre
 
 - **[Getting Started Guide](https://github.com/SVappsLAB/iRacingTelemetrySDK#readme)** - Setup and basic usage
 - **[Sample Projects](https://github.com/SVappsLAB/iRacingTelemetrySDK/tree/main/Samples)** - Basic monitoring, data export, track analysis
+- **[Architecture and Design](https://github.com/SVappsLAB/iRacingTelemetrySDK/blob/main/ARCHITECTURE.md)** - Threading model, buffering, performance, and metrics
 - **[Advanced Usage](https://github.com/SVappsLAB/iRacingTelemetrySDK/blob/main/docs/ADVANCED.md)** - Direct stream access, multiple consumers, and cancellation behavior
 - **[Migration Guide](https://github.com/SVappsLAB/iRacingTelemetrySDK/blob/main/docs/MIGRATION_GUIDE.md)** - Upgrading from previous versions
 - **[GitHub Repository](https://github.com/SVappsLAB/iRacingTelemetrySDK)** - Source code and releases

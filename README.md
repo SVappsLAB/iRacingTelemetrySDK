@@ -10,6 +10,7 @@ Perfect for building **real-time dashboards**, **data analysis tools**, **race e
 ## Table of Contents
 
 - [Features](#features)
+- [How It Compares](#how-it-compares)
 - [Requirements](#requirements)
 - [Quick Example](#quick-example)
 - [Getting Started](#getting-started)
@@ -17,10 +18,9 @@ Perfect for building **real-time dashboards**, **data analysis tools**, **race e
 - [Controlling the Simulator](#controlling-the-simulator)
 - [Samples](#samples)
 - [Advanced Usage](./docs/ADVANCED.md)
+- [Architecture and Design](./ARCHITECTURE.md)
 - [Documentation](#documentation)
 - [AI-Assisted Development](#ai-assisted-development)
-- [Performance and Design](#performance-and-design)
-- [Performance Monitoring](#performance-monitoring)
 - [Building from Source](#building-from-source)
 - [License](#license)
 
@@ -35,6 +35,36 @@ Perfect for building **real-time dashboards**, **data analysis tools**, **race e
 - **Built-in Metrics**: Integrated performance monitoring via System.Diagnostics.Metrics
 - **Pause and Resume**: Control data flow while background processing continues
 - **Sim Control**: Remotely control the simulator (pit commands, replay, cameras, chat, and more)
+
+## How It Compares
+
+There are several .NET libraries for reading iRacing telemetry. Most are thin wrappers over the iRacing shared-memory layout: you look variables up by string name at runtime, receive data through events on the caller's thread, and get whatever the raw SDK gives you. That works, and for simple tools it's enough.
+
+This SDK takes a different approach — it treats telemetry as a **typed, high-throughput data stream** rather than a bag of named values.
+
+| | **iRacingTelemetrySDK** | **Typical .NET iRacing libraries** |
+|---|---|---|
+| **Variable access** | Compile-time generated `TelemetryData` struct — only the variables you declare | Runtime lookup by string name or dictionary indexing |
+| **Type safety** | Enum-based selection, validated at build time, full IntelliSense | Strings resolved at runtime; typos surface as runtime errors or nulls |
+| **API model** | Async data streams with `async`/`await` and automatic backpressure | Event handlers or manual polling loops |
+| **Threading** | Dedicated background tasks for collection and YAML parsing — your handler never blocks the data source | Processing commonly runs on the caller's thread |
+| **Backpressure** | Bounded 60-sample ring buffer with drop-oldest; slow consumers cost bounded data, never memory | Often unbounded or unspecified |
+| **Live + IBT parity** | Identical strongly-typed API for both | Frequently separate code paths, or live-only |
+| **Throughput** | 600,000+ records/sec on IBT playback | Rarely a stated design goal |
+| **Observability** | Built-in `System.Diagnostics.Metrics` counters and histograms | Typically none |
+| **Simulator control** | Pit, replay, camera, chat, and broadcast commands included | Varies; often read-only |
+| **AI agent support** | Dedicated agent-facing usage and reference docs | Rare |
+
+Not every project needs this. If you want a handful of values on a secondary display, a simpler wrapper is fine. If you're building a **real-time dashboard, a race engineering tool, or an analysis pipeline that replays full sessions**, the differences above are the ones that show up.
+
+**Why it's fast:**
+
+- **Source-generated structs** eliminate runtime reflection and string lookups from the hot path — only the variables you asked for are ever decoded
+- **Lock-free bounded streams** keep telemetry current under load instead of queueing unboundedly behind a slow consumer
+- **Zero-copy reads** via `ReadOnlySpan<T>` over mapped memory, keeping steady-state allocation and GC pressure near zero
+- **Independent background tasks** mean CPU-intensive session-info YAML parsing never stalls the 60Hz telemetry path
+
+📖 Full details, including the threading model, buffering semantics, and built-in metrics: **[Architecture and Design](./ARCHITECTURE.md)**
 
 ## Requirements
 
@@ -264,6 +294,7 @@ See [Samples Directory](./Samples/README.md) for ready-to-run example projects i
 
 ## Documentation
 
+- **[Architecture and Design](./ARCHITECTURE.md)** - Threading model, data streaming and buffering, performance characteristics, and built-in metrics
 - **[Advanced Usage](./docs/ADVANCED.md)** - Direct stream access, multiple consumers, and cancellation behavior
 - **[Migration Guide](./docs/MIGRATION_GUIDE.md)** - Upgrading from early pre-1.0 releases
 
@@ -281,140 +312,6 @@ When working with the iRacing Telemetry SDK, read
 https://raw.githubusercontent.com/SVappsLAB/iRacingTelemetrySDK/main/docs/ai/SDK_USAGE.md first,
 and https://raw.githubusercontent.com/SVappsLAB/iRacingTelemetrySDK/main/docs/ai/SDK_REFERENCE.md for advanced patterns.
 ```
-
-## Performance and Design
-
-The SDK is designed for high performance with bounded async data streaming that keeps telemetry current under load.
-
-### Data Streaming Benefits
-
-**Data Safety:**
-- **60-sample ring buffer** with FIFO (First-In-First-Out) and destructive-read semantics
-- Provides **up to 1 second** of buffering at iRacing's 60Hz update rate
-- When the buffer fills, **oldest unread samples are automatically dropped** to make room for new data
-- **Drop-oldest strategy** ensures the SDK never blocks and prioritizes the most recent telemetry
-
-**Performance:**
-- **Non-blocking bounded streams** reduce contention and keep telemetry current under load
-- **Asynchronous processing** keeps your main thread responsive
-- **~2x performance improvement** over traditional event-based approaches
-- **600,000+ records/sec** processing capability for IBT files
-
-**Flexibility:**
-- **Two consumption patterns**: Handler callbacks (`Monitor(handlers, ct)`) or direct stream access
-- **Independent streams**: Consume only the data types you need
-- **Cancellation support**: Graceful shutdown with `CancellationToken`
-
-### Architecture Overview
-
-**Key Design Principles:**
-
-- **Strongly Typed Telemetry Data**: Use strong type checking throughout
-- **Non-blocking Streams**: All real-time data flows through asynchronous data streams
-- **Separation of Concerns**: Telemetry data (high-frequency, time-critical) and Session Info processing (low frequency, CPU-intensive) run independently
-- **Background Processing**: CPU-intensive YAML parsing runs in an independent async processing task so telemetry data handling stays responsive.
-
-```mermaid
-graph TB
-    subgraph "Data Sources"
-        iRacing[iRacing Simulator<br/>60Hz Live Data]
-        IBT[IBT File<br/>Historical Data]
-    end
-
-    subgraph "Task1 - Telemetry Data"
-        MainTask[Telemetry Data Stream]
-    end
-
-    subgraph "Task2 - Session Info"
-        SessionTask[Session Info Processing<br/>YAML Parsing]
-    end
-
-    subgraph "High Performance Data Streams"
-        TelemetryStream[TelemetryData]
-        SessionStream[SessionData]
-        RawStream[SessionDataYaml]
-    end
-
-    iRacing --> MainTask
-    IBT --> MainTask
-
-    MainTask --> TelemetryStream
-    MainTask --> SessionTask
-    SessionTask --> SessionStream
-    SessionTask --> RawStream
-
-    classDef dataSource fill:#e1f5fe
-    classDef processing fill:#f3e5f5
-    classDef stream fill:#e8f5e8
-
-    class iRacing,IBT dataSource
-    class MainTask,SessionTask processing
-    class TelemetryStream,SessionStream,RawStream stream
-```
-
-
-### Performance Monitoring
-
-The SDK includes built-in support for System.Diagnostics.Metrics to help monitor performance and diagnose issues.
-
-#### Available Metrics
-
-The SDK exposes several metrics automatically:
-
-- **telemetry_records_processed_total**: Counter of processed telemetry records
-- **telemetry_records_dropped_total**: Counter of dropped records (when channels are full)
-- **telemetry_processing_duration_microseconds**: Histogram of telemetry processing time
-- **sessioninfo_records_processed_total**: Counter of session info updates processed
-- **sessioninfo_processing_duration_milliseconds**: Histogram of session info processing time
-
-#### Enabling Metrics with Dependency Injection
-
-```csharp
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-
-[RequiredTelemetryVars([TelemetryVar.Speed, TelemetryVar.RPM])]
-public class Program
-{
-    public static async Task Main(string[] args)
-    {
-        var host = Host.CreateDefaultBuilder(args)
-            .ConfigureServices((context, services) =>
-            {
-                services.AddMetrics();  // Enable metrics support
-                services.AddLogging(logging => logging.AddConsole());
-            })
-            .Build();
-
-        var logger = host.Services.GetRequiredService<ILogger<Program>>();
-        var meterFactory = host.Services.GetRequiredService<IMeterFactory>();
-
-        // Create client with metrics support
-        var clientOptions = new ClientOptions { MeterFactory = meterFactory };
-        await using var client = TelemetryClient<TelemetryData>.Create(logger, null, clientOptions);
-
-        // Your telemetry code here...
-    }
-}
-```
-
-#### Monitoring with dotnet-counters
-
-Use any monitoring tool that supports System.Diagnostics.Metrics, like OpenTelemetry or the free Microsoft provided `dotnet-counters` tool to monitor SDK performance in real-time:
-
-```bash
-# Monitor all SDK metrics for a running application named "YourApp"
-dotnet-counters monitor --name "YourApp" --counters SVappsLAB.iRacingTelemetrySDK
-
-# Sample output:
-# [SVappsLAB.iRacingTelemetrySDK]
-#     telemetry_records_processed_total                    45,231
-#     telemetry_records_dropped_total                           0
-#     sessioninfo_records_processed_total                      12
-```
-
-This helps identify performance bottlenecks, monitor processing rates, and detect if records are being dropped due to slow consumption.
 
 ## Building from Source
 
