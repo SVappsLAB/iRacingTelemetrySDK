@@ -52,6 +52,15 @@ internal abstract unsafe class DataProviderBase : IAsyncDisposable
     VarHeaderDictionary? _varHeaders;
     int _lastSessionInfoUpdate = -1; // latest session info update counter
 
+    // last layout we logged. used to detect when a region moves or resizes, so
+    // we only log the layout when it actually changes (see LogLayoutIfChanged)
+    int _loggedNumVars = -1;
+    int _loggedBufLen = -1;
+    int _loggedVarHeaderOffset = -1;
+    int _loggedSessionInfoOffset = -1;
+    int _loggedSessionInfoLen = -1;
+    int _loggedFirstBufOffset = -1;
+
     protected MemoryMappedFile? _mmFile;
     protected MemoryMappedViewAccessor? _viewAccessor;
 
@@ -112,7 +121,70 @@ internal abstract unsafe class DataProviderBase : IAsyncDisposable
             _telemetryDataBuffer = new byte[_header.bufLen];
         }
 
+        if (_logger.IsEnabled(LogLevel.Debug))
+	        LogLayoutIfChanged();
+
         return _header;
+    }
+
+    // log where each region of the memory mapped data lives
+    protected void LogLayoutIfChanged()
+    {
+        var firstBufOffset = _header.GetVarBuf(0).bufOffset;
+
+        var changed =
+            _header.numVars != _loggedNumVars ||
+            _header.bufLen != _loggedBufLen ||
+            _header.varHeaderOffset != _loggedVarHeaderOffset ||
+            _header.sessionInfoOffset != _loggedSessionInfoOffset ||
+            _header.sessionInfoLen != _loggedSessionInfoLen ||
+            firstBufOffset != _loggedFirstBufOffset;
+
+        if (!changed)
+            return;
+
+        var isFirstLog = _loggedNumVars == -1;
+
+        _loggedNumVars = _header.numVars;
+        _loggedBufLen = _header.bufLen;
+        _loggedVarHeaderOffset = _header.varHeaderOffset;
+        _loggedSessionInfoOffset = _header.sessionInfoOffset;
+        _loggedSessionInfoLen = _header.sessionInfoLen;
+        _loggedFirstBufOffset = firstBufOffset;
+
+        LogLayout(isFirstLog ? "initial" : "changed");
+    }
+
+    void LogLayout(string reason)
+    {
+        var source = GetType().Name;
+
+        _logger.LogDebug("{source} layout ({reason}): ver={ver}, status={status}, tickRate={tickRate}, sessionInfoUpdate={sessionInfoUpdate}",
+            source, reason, _header.ver, _header.status, _header.tickRate, _header.sessionInfoUpdate);
+
+        _logger.LogDebug("{source} layout ({reason}): sizeof(header)={headerSize}, sizeof(diskSubHeader)={diskSubHeaderSize}, sizeof(varHeader)={varHeaderSize}, sizeof(varBuf)={varBufSize}",
+            source, reason, sizeof(irsdk_header), sizeof(irsdk_diskSubHeader), sizeof(irsdk_varHeader), sizeof(irsdk_varBuf));
+
+        // varHeader array: numVars entries, each sizeof(irsdk_varHeader) bytes
+        var varHeaderBytes = (long)_header.numVars * sizeof(irsdk_varHeader);
+        _logger.LogDebug("{source} layout ({reason}): varHeaderOffset={varHeaderOffset}, numVars={numVars}, varHeaderBytes={varHeaderBytes}, varHeaderEnd={varHeaderEnd}",
+            source, reason, _header.varHeaderOffset, _header.numVars, varHeaderBytes, _header.varHeaderOffset + varHeaderBytes);
+
+        // session info yaml. 'sessionInfoLen' is the length in use, which may be smaller than what the irsdk reserved
+        _logger.LogDebug("{source} layout ({reason}): sessionInfoOffset={sessionInfoOffset}, sessionInfoLen={sessionInfoLen}, sessionInfoEnd={sessionInfoEnd}",
+            source, reason, _header.sessionInfoOffset, _header.sessionInfoLen, (long)_header.sessionInfoOffset + _header.sessionInfoLen);
+
+        // telemetry buffers
+        var numBuf = Math.Min(_header.numBuf, irSDKDefines.Constants.IRSDK_MAX_BUFS);
+        _logger.LogDebug("{source} layout ({reason}): numBuf={numBuf}, bufLen={bufLen}, curBuf={curBuf}, curBufTickCount={curBufTickCount}",
+            source, reason, _header.numBuf, _header.bufLen, _header.curBuf, _header.curBufTickCount);
+
+        for (var i = 0; i < numBuf; i++)
+        {
+            var varBuf = _header.GetVarBuf(i);
+            _logger.LogDebug("{source} layout ({reason}): varBuf[{index}] bufOffset={bufOffset}, bufEnd={bufEnd}, tickCount={tickCount}, tickCountBegin={tickCountBegin}, pad={pad}",
+                source, reason, i, varBuf.bufOffset, (long)varBuf.bufOffset + _header.bufLen, varBuf.tickCount, varBuf.tickCountBegin, varBuf.pad);
+        }
     }
     public string GetSessionInfoYaml()
     {

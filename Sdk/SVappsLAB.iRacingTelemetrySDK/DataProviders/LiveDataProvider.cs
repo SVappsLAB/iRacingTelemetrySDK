@@ -42,7 +42,9 @@ internal unsafe class LiveDataProvider : DataProviderBase, IDataProvider
         _viewAccessor = _mmFile.CreateViewAccessor();
         _viewAccessor!.SafeMemoryMappedViewHandle.AcquirePointer(ref _dataPtr);
 
-        // read header 
+        _logger.LogDebug("live layout: memoryMappedFile={memMapFile}", IRSDK_MemMapFileName);
+
+        // read header
         _header = GetHeader();
 
         // data ready event
