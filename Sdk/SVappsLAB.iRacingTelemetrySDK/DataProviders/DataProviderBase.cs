@@ -35,7 +35,7 @@ internal enum irsdk_StatusField
 
 internal class VarHeaderDictionary : Dictionary<string, irsdk_varHeader>
 {
-    public VarHeaderDictionary() : base(StringComparer.InvariantCultureIgnoreCase)
+    public VarHeaderDictionary() : base(StringComparer.OrdinalIgnoreCase)
     {
     }
 }
@@ -51,6 +51,15 @@ internal abstract unsafe class DataProviderBase : IAsyncDisposable
     int _oldVarBufLen;
     VarHeaderDictionary? _varHeaders;
     int _lastSessionInfoUpdate = -1; // latest session info update counter
+
+    // last layout we logged. used to detect when a region moves or resizes, so
+    // we only log the layout when it actually changes (see LogLayoutIfChanged)
+    int _loggedNumVars = -1;
+    int _loggedBufLen = -1;
+    int _loggedVarHeaderOffset = -1;
+    int _loggedSessionInfoOffset = -1;
+    int _loggedSessionInfoLen = -1;
+    int _loggedFirstBufOffset = -1;
 
     protected MemoryMappedFile? _mmFile;
     protected MemoryMappedViewAccessor? _viewAccessor;
@@ -112,7 +121,70 @@ internal abstract unsafe class DataProviderBase : IAsyncDisposable
             _telemetryDataBuffer = new byte[_header.bufLen];
         }
 
+        if (_logger.IsEnabled(LogLevel.Debug))
+	        LogLayoutIfChanged();
+
         return _header;
+    }
+
+    // log where each region of the memory mapped data lives
+    protected void LogLayoutIfChanged()
+    {
+        var firstBufOffset = _header.GetVarBuf(0).bufOffset;
+
+        var changed =
+            _header.numVars != _loggedNumVars ||
+            _header.bufLen != _loggedBufLen ||
+            _header.varHeaderOffset != _loggedVarHeaderOffset ||
+            _header.sessionInfoOffset != _loggedSessionInfoOffset ||
+            _header.sessionInfoLen != _loggedSessionInfoLen ||
+            firstBufOffset != _loggedFirstBufOffset;
+
+        if (!changed)
+            return;
+
+        var isFirstLog = _loggedNumVars == -1;
+
+        _loggedNumVars = _header.numVars;
+        _loggedBufLen = _header.bufLen;
+        _loggedVarHeaderOffset = _header.varHeaderOffset;
+        _loggedSessionInfoOffset = _header.sessionInfoOffset;
+        _loggedSessionInfoLen = _header.sessionInfoLen;
+        _loggedFirstBufOffset = firstBufOffset;
+
+        LogLayout(isFirstLog ? "initial" : "changed");
+    }
+
+    void LogLayout(string reason)
+    {
+        var source = GetType().Name;
+
+        _logger.LogDebug("{source} layout ({reason}): ver={ver}, status={status}, tickRate={tickRate}, sessionInfoUpdate={sessionInfoUpdate}",
+            source, reason, _header.ver, _header.status, _header.tickRate, _header.sessionInfoUpdate);
+
+        _logger.LogDebug("{source} layout ({reason}): sizeof(header)={headerSize}, sizeof(diskSubHeader)={diskSubHeaderSize}, sizeof(varHeader)={varHeaderSize}, sizeof(varBuf)={varBufSize}",
+            source, reason, sizeof(irsdk_header), sizeof(irsdk_diskSubHeader), sizeof(irsdk_varHeader), sizeof(irsdk_varBuf));
+
+        // varHeader array: numVars entries, each sizeof(irsdk_varHeader) bytes
+        var varHeaderBytes = (long)_header.numVars * sizeof(irsdk_varHeader);
+        _logger.LogDebug("{source} layout ({reason}): varHeaderOffset={varHeaderOffset}, numVars={numVars}, varHeaderBytes={varHeaderBytes}, varHeaderEnd={varHeaderEnd}",
+            source, reason, _header.varHeaderOffset, _header.numVars, varHeaderBytes, _header.varHeaderOffset + varHeaderBytes);
+
+        // session info yaml. 'sessionInfoLen' is the length in use, which may be smaller than what the irsdk reserved
+        _logger.LogDebug("{source} layout ({reason}): sessionInfoOffset={sessionInfoOffset}, sessionInfoLen={sessionInfoLen}, sessionInfoEnd={sessionInfoEnd}",
+            source, reason, _header.sessionInfoOffset, _header.sessionInfoLen, (long)_header.sessionInfoOffset + _header.sessionInfoLen);
+
+        // telemetry buffers
+        var numBuf = Math.Min(_header.numBuf, irSDKDefines.Constants.IRSDK_MAX_BUFS);
+        _logger.LogDebug("{source} layout ({reason}): numBuf={numBuf}, bufLen={bufLen}, curBuf={curBuf}, curBufTickCount={curBufTickCount}",
+            source, reason, _header.numBuf, _header.bufLen, _header.curBuf, _header.curBufTickCount);
+
+        for (var i = 0; i < numBuf; i++)
+        {
+            var varBuf = _header.GetVarBuf(i);
+            _logger.LogDebug("{source} layout ({reason}): varBuf[{index}] bufOffset={bufOffset}, bufEnd={bufEnd}, tickCount={tickCount}, tickCountBegin={tickCountBegin}, pad={pad}",
+                source, reason, i, varBuf.bufOffset, (long)varBuf.bufOffset + _header.bufLen, varBuf.tickCount, varBuf.tickCountBegin, varBuf.pad);
+        }
     }
     public string GetSessionInfoYaml()
     {
@@ -126,7 +198,15 @@ internal abstract unsafe class DataProviderBase : IAsyncDisposable
 
     public object? GetVarValue(string varName)
     {
-        if (!_varHeaders!.TryGetValue(varName, out irsdk_varHeader vh))
+        // headers/buffer are populated lazily by GetHeader() once the provider has read at least one
+        // header from the data source
+        if (_varHeaders == null || _telemetryDataBuffer == null)
+        {
+            _logger.LogDebug("Telemetry data not yet available; ignoring lookup for [{varName}]", varName);
+            return null;
+        }
+
+        if (!_varHeaders.TryGetValue(varName, out irsdk_varHeader vh))
         {
             _logger.LogDebug("Telemetry variable [{varName}] not found in data provider", varName);
             return null;
@@ -180,6 +260,20 @@ internal abstract unsafe class DataProviderBase : IAsyncDisposable
         return val;
     }
 
+    // maps irsdk_VarType -> CLR Type mapping
+    internal static Type GetClrType(irsdk_VarType type, int count) => type switch
+    {
+        // a single char returns the raw byte; a char buffer decodes to one string (a text field, not
+        // an array of separate strings)
+        irsdk_VarType.irsdk_char => count > 1 ? typeof(string) : typeof(byte),
+        irsdk_VarType.irsdk_bool => count > 1 ? typeof(bool[]) : typeof(bool),
+        // bitField is packed into the same int/int[] path as irsdk_int above
+        irsdk_VarType.irsdk_int or irsdk_VarType.irsdk_bitField => count > 1 ? typeof(int[]) : typeof(int),
+        irsdk_VarType.irsdk_float => count > 1 ? typeof(float[]) : typeof(float),
+        irsdk_VarType.irsdk_double => count > 1 ? typeof(double[]) : typeof(double),
+        _ => throw new NotImplementedException($"{type} not implemented")
+    };
+
     // wait for iRacing to signal there is new data
     public abstract Task<bool> WaitForDataReady(TimeSpan timeSpan, CancellationToken cancellationToken = default);
 
@@ -190,9 +284,13 @@ internal abstract unsafe class DataProviderBase : IAsyncDisposable
 
 
     // with IBT files, the 'recNum' tells us which data record in the mmf we should read
+    //
+    // IBT files always have a single buffer, and don't populate 'curBuf' (it is
+    // only written by the sim, for live data). read varBuf[0] directly, rather
+    // than resolving through the live-only field
     protected void CopyNewTelemetryDataToBuffer(int recNum = 0)
     {
-        var offset = _header.GetMostRecentBuffer().bufOffset + recNum * _header.bufLen;
+        var offset = _header.GetVarBuf(0).bufOffset + recNum * _header.bufLen;
         var ros = new ReadOnlySpan<byte>(_dataPtr + offset, _header.bufLen);
         ros.CopyTo(_telemetryDataBuffer);
     }

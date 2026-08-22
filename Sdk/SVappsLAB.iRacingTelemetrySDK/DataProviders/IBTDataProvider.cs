@@ -55,12 +55,40 @@ internal unsafe class IBTDataProvider : DataProviderBase, IDataProvider
         _viewAccessor = _mmFile.CreateViewAccessor(0, 0, MemoryMappedFileAccess.Read);
         _viewAccessor!.SafeMemoryMappedViewHandle.AcquirePointer(ref _dataPtr);
 
-        // read header 
+        // read header
         _header = GetHeader();
 
         _numRecords = GetNumRecordsInIBTFile();
 
+        if (_logger.IsEnabled(LogLevel.Debug))
+            LogIBTFileLayout();
+
         _governor.StartPlayback();
+    }
+
+    // the base class logs the regions common to live and IBT data.
+    // add the the disk sub header, and the record region till end of the file
+    void LogIBTFileLayout()
+    {
+        var diskSubHeader = GetDiskSubHeader();
+
+        _logger.LogDebug("IBT layout: file={file}", _ibtOptions.IbtFilePath);
+
+        // the disk sub header sits immediately after the header
+        _logger.LogDebug("IBT layout: diskSubHeaderOffset={diskSubHeaderOffset}, diskSubHeaderEnd={diskSubHeaderEnd}, sessionStartDate={sessionStartDate}, sessionStartTime={sessionStartTime}, sessionEndTime={sessionEndTime}, sessionLapCount={sessionLapCount}, sessionRecordCount={sessionRecordCount}",
+            sizeof(irsdk_header), sizeof(irsdk_header) + sizeof(irsdk_diskSubHeader),
+            diskSubHeader.sessionStartDate, diskSubHeader.sessionStartTime, diskSubHeader.sessionEndTime,
+            diskSubHeader.sessionLapCount, diskSubHeader.sessionRecordCount);
+
+        // records are written one after the other, starting at the first (only) buffer offset
+        var firstRecordOffset = _header.GetVarBuf(0).bufOffset;
+        var recordBytes = (long)diskSubHeader.sessionRecordCount * _header.bufLen;
+        var computedFileLength = firstRecordOffset + recordBytes;
+        var actualFileLength = new FileInfo(_ibtOptions.IbtFilePath).Length;
+
+        _logger.LogDebug("IBT layout: firstRecordOffset={firstRecordOffset}, recordCount={recordCount}, bufLen={bufLen}, recordBytes={recordBytes}, computedFileLength={computedFileLength}, actualFileLength={actualFileLength}, matches={matches}",
+            firstRecordOffset, diskSubHeader.sessionRecordCount, _header.bufLen, recordBytes,
+            computedFileLength, actualFileLength, computedFileLength == actualFileLength);
     }
 
     public int GetNumRecordsInIBTFile()

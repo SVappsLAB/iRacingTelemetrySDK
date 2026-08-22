@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2024-2025 Scott Velez
+ * Copyright (C) 2024-2026 Scott Velez
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 using Microsoft.Extensions.Logging;
 using SVappsLAB.iRacingTelemetrySDK;
 
-namespace MinimalExample;
+namespace MinimalExampleAsync;
 // 1. Define the telemetry variables you want to track
 [RequiredTelemetryVars([TelemetryVar.Speed, TelemetryVar.RPM])]
 internal class Program
@@ -26,14 +26,15 @@ internal class Program
     {
         // 2. Create logger
         var logger = LoggerFactory.Create(builder => builder.AddConsole())
-                                  .CreateLogger("MinimalExample");
+                                  .CreateLogger("MinimalExampleAsync");
 
         // 3. Choose data source
         IBTOptions? ibtOptions = null;  // null for live telemetry from iRacing
                                         // = new IBTOptions("gt3_spa.ibt");  IBT filepath for file playback
         ibtOptions = new IBTOptions(args[0]);
 
-        // 4. Create telemetry client
+        // 4. Create telemetry client - using the default high throughput Async delivery mode.
+        // This mode is best for applications that know the telemetry variables they want to track at compile time.
         await using var client = TelemetryClient<TelemetryData>.Create(logger, ibtOptions);
 
         // 5. Use cancellation token for proper shutdown

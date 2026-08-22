@@ -19,12 +19,14 @@ For consumer-app usage patterns, read `docs/ai/SDK_USAGE.md` first and `docs/ai/
 ```powershell
 dotnet build .\Sdk\SVappsLAB.iRacingTelemetrySDK.slnx
 dotnet build .\Samples\Samples.slnx
-dotnet test .\Sdk\tests\UnitTests\UnitTests.csproj --no-build
+dotnet test --project .\Sdk\tests\UnitTests\UnitTests.csproj --no-build
 dotnet run --project .\Sdk\tests\SmokeTests\SmokeTests.csproj -- --filter-trait Category=ibt
 dotnet pack .\Sdk\SVappsLAB.iRacingTelemetrySDK\SVappsLAB.iRacingTelemetrySDK.csproj
 ```
 
 Run `Category=live` smoke tests only with iRacing running in an active Windows session. Run `Category=manual` tests only when the local developer setup matches the test requirements.
+
+`global.json` pins `test.runner` to `Microsoft.Testing.Platform`, so `dotnet test` needs `--project`/`--solution` (a bare positional path is rejected) and does not understand VSTest-style `--filter`. Use `dotnet run --project`, not `dotnet test`, for `SmokeTests` - its `launchSettings.json` injects a default `--filter-class` that `dotnet test` combines with (rather than overrides with) any `--filter-trait` you add, silently yielding "zero tests ran". See `Sdk/tests/README.md` for details.
 
 ## Style
 

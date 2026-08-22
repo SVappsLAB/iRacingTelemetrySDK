@@ -35,11 +35,25 @@ await using var realtimeClient = TelemetryClient<TelemetryData>.Create(logger, r
 // Metrics support.
 var clientOptions = new ClientOptions { MeterFactory = meterFactory };
 await using var metricsClient = TelemetryClient<TelemetryData>.Create(logger, ibtOptions, clientOptions);
+
+// Synchronous delivery - required to call GetValue(); it throws InvalidOperationException under
+// the default Async mode. See "Telemetry Delivery Mode" below.
+var syncOptions = new ClientOptions { DeliveryMode = TelemetryDeliveryMode.Synchronous };
+await using var syncClient = TelemetryClient<TelemetryData>.Create(logger, ibtOptions, syncOptions);
 ```
 
 Validate IBT file paths before creating `IBTOptions` when paths come from user input. The client constructor throws `FileNotFoundException` for missing files.
 
 `playBackSpeedMultiplier: 1` runs IBT playback at real-time speed. The default, `int.MaxValue`, processes as fast as possible. Choose `1` for visualization-style apps and the default for batch analysis.
+
+### Telemetry Delivery Mode
+
+`ClientOptions.DeliveryMode` controls how samples move from the background read loop to `OnTelemetryUpdate`, and the SDK only operates in one mode at a time - you cannot create a client in one mode and read its data with the other's mechanism:
+
+- **`TelemetryDeliveryMode.Async` (default).** Samples are pushed onto a 60-item drop-oldest channel and consumed by an independent task - high throughput, but production and consumption are decoupled. Because there'd be no way to guarantee it reflects the same record as the `T` sample the handler is currently processing, `GetValue()` is disallowed in this mode and throws `InvalidOperationException`.
+- **`TelemetryDeliveryMode.Synchronous`.** Each sample is awaited directly by `OnTelemetryUpdate` from the same loop that reads it - the next record isn't read until the handler returns. `GetValue()` only works in this mode, and is guaranteed to match the delivered sample for the handler's full duration. Trade-off: processing/playback speed is bounded by handler speed, and the raw `TelemetryData` async-enumerable stream throws `InvalidOperationException` if accessed (there's nothing to queue - use the handler-based `Monitor` overload).
+
+Choose `Synchronous` only when code needs `GetValue()` - whether alone or mixed with the strongly-typed `T` in the same handler; otherwise `Async` is the better default.
 
 ## Handler Callback Pattern
 

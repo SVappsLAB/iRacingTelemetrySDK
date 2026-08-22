@@ -6,9 +6,14 @@ All of these examples can be used with a running 'live' instance of iRacing, or 
 
 All samples define a `TelemetryHandlers<TelemetryData>` variable and pass it to `Monitor(handlers, ct)` for telemetry consumption. For setup and basic usage see the [main README](../README.md); for direct stream access and other advanced patterns see [Advanced Usage](../docs/ADVANCED.md).
 
-* [MinimalExample](./MinimalExample/)
+* [MinimalExampleAsync](./MinimalExampleAsync/)
 
-    The smallest end-to-end example. A good starting point that shows how to create a client and handle telemetry, session info, connection state, and error callbacks via `Monitor(handlers, ct)`.
+    A small end-to-end example. A good starting point that shows how to create a client and handle telemetry, session info, connection state, and error callbacks via `Monitor(handlers, ct)`. Uses the default `TelemetryDeliveryMode.Async` and the strongly-typed `TelemetryData` struct for strong static typing and maximum efficency and performance.
+
+* [MinimalExampleSync](./MinimalExampleSync/)
+
+    Same shape as MinimalExampleAsync, but looks up telemetry variables dynamically with `GetValue("<var>")` instead of a strongly-typed property.
+    Synchronous mode allows you to query for any variable, at runtime, at the cost of throughput. See [SDK_REFERENCE.md](../docs/ai/SDK_REFERENCE.md#telemetry-delivery-mode) for details on the tradeoffs.
 
 * [DumpVariables_DumpSessionInfo](./DumpVariables_DumpSessionInfo/)
 

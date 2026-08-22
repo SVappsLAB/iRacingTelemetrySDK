@@ -14,9 +14,6 @@
  * limitations under the License.
 **/
 
-using System;
-using System.Threading.Tasks;
-
 namespace SVappsLAB.iRacingTelemetrySDK;
 
 /// <summary>

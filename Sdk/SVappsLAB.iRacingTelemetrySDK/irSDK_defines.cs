@@ -90,8 +90,8 @@ internal unsafe struct irsdk_header
     public irsdk_varBuf varBuf4;
 
     #region methods
-    public irsdk_varBuf GetMostRecentBuffer() => GetVarBuf(GetMostRecentBufferIndex());
-
+    // NOTE: 'curBuf' is a live-only field. IBT files leave it zero, so this is
+    // only meaningful for live data. IBT readers should use varBuf[0] directly
     public int GetMostRecentBufferIndex()
     {
         // use curBuf to find the most recently written buffer
