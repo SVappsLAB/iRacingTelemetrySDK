@@ -122,7 +122,7 @@ internal abstract unsafe class DataProviderBase : IAsyncDisposable
         }
 
         if (_logger.IsEnabled(LogLevel.Debug))
-	        LogLayoutIfChanged();
+            LogLayoutIfChanged();
 
         return _header;
     }

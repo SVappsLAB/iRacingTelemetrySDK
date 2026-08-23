@@ -18,6 +18,7 @@ using Microsoft.Extensions.Logging;
 using SVappsLAB.iRacingTelemetrySDK;
 
 namespace DumpVariables_DumpSessionInfo;
+
 [RequiredTelemetryVars([TelemetryVar.RPM])]
 internal class Program
 {

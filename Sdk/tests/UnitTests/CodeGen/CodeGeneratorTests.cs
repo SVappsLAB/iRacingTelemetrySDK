@@ -62,7 +62,7 @@ public class CodeGeneratorTests
         Assert.Empty(telemetryData.GetMembers().OfType<IPropertySymbol>());
 
         // the consumer program itself must compile cleanly
-        Assert.Empty(output.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
+        Assert.Empty(output.GetDiagnostics(TestContext.Current.CancellationToken).Where(d => d.Severity == DiagnosticSeverity.Error));
 
         // an informational diagnostic flags the (possibly accidental) empty list
         var info = Assert.Single(diagnostics, d => d.Id == "EmptyVarList");
@@ -86,7 +86,7 @@ public class CodeGeneratorTests
         Assert.Contains("Speed", properties);
         Assert.Contains("RPM", properties);
 
-        Assert.Empty(output.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
+        Assert.Empty(output.GetDiagnostics(TestContext.Current.CancellationToken).Where(d => d.Severity == DiagnosticSeverity.Error));
         Assert.DoesNotContain(diagnostics, d => d.Id == "EmptyVarList");
     }
 }
