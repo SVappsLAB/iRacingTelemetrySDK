@@ -57,7 +57,8 @@ public abstract partial class Base<T> where T : class
                     Assert.True(telemetryData.CarIdxTrackSurface == null || telemetryData.CarIdxTrackSurface.Length >= 64);
 
                     // only need one sample
-                    if (_variableSummary is null) {
+                    if (_variableSummary is null)
+                    {
                         var telemetryVars = client.GetTelemetryVariables();
                         var variableSummary = VariableSummary.Create(telemetryVars);
                         _variableSummary = variableSummary;

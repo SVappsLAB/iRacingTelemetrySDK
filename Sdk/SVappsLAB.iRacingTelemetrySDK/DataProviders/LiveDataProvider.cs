@@ -60,7 +60,7 @@ internal unsafe class LiveDataProvider : DataProviderBase, IDataProvider
     internal bool ProcessNewData()
     {
         // copy new data to the access buffer,
-			// validating data is good and no write was in progress
+        // validating data is good and no write was in progress
         if (!TryCopyLiveTelemetryDataToBuffer(out var latestTickCount))
         {
             _logger.LogWarning("data changed while we were reading it. skipping this sample");

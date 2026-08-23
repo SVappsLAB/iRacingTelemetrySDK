@@ -60,7 +60,7 @@ internal sealed class TelemetryDataAccessor<T> where T : struct
             }
             catch (Exception ex)
             {
-                _logger.LogWarning("Failed to set property {PropertyName} with value '{RawValue}': {Error}", 
+                _logger.LogWarning("Failed to set property {PropertyName} with value '{RawValue}': {Error}",
                     accessor.PropertyName, rawValue, ex.Message);
             }
         }
