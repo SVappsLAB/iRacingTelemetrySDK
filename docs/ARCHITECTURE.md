@@ -238,7 +238,7 @@ In the default `TelemetryDeliveryMode.Async` mode, application-facing streams us
 
 This policy favors recency over complete delivery. Consumers that require lossless processing must read the streams promptly and provide an appropriate downstream buffer; see [Advanced Usage](./ADVANCED.md).
 
-Async mode supports handler-based consumption through `Monitor(handlers, ct)` and direct access to each stream. In `TelemetryDeliveryMode.Synchronous`, telemetry samples are delivered inline to `OnTelemetryUpdate`; the producer does not read the next sample until the handler completes. `TelemetryData` is unavailable in synchronous mode. Both delivery modes accept cancellation through `CancellationToken`.
+Async mode supports handler-based consumption through `Monitor(handlers, ct)` and direct access to each stream. In `TelemetryDeliveryMode.Synchronous`, telemetry samples are delivered inline to `OnTelemetryUpdate`; the producer does not read the next sample until the handler completes. Only `OnTelemetryUpdate` is affected - the session, raw-session, connect-state, and error handlers are served from their bounded channels in both modes. `TelemetryData` is unavailable in synchronous mode. Both delivery modes accept cancellation through `CancellationToken`.
 
 ## Performance Characteristics
 
