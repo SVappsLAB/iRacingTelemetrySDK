@@ -66,7 +66,7 @@ public class IBTPlaybackGovernor : IClassFixture<LogFixture>
                 {1000, 5}
         };
 
-    [Theory]
+    [Theory(Explicit = true)]
     [Trait("Category", "manual")]
     [MemberData(nameof(Data))]
     public async Task GovernorTests(int speedMultiplier, int secsOfDataToSimulate)

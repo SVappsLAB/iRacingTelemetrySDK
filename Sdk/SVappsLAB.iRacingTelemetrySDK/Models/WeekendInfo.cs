@@ -14,8 +14,6 @@
  * limitations under the License.
 **/
 
-using System;
-
 #nullable disable
 namespace SVappsLAB.iRacingTelemetrySDK;
 
@@ -76,6 +74,7 @@ public class WeekendInfo
     public int NumCarTypes { get; set; } // 1
     public string AIRosterName { get; set; } // ""
     public int HeatRacing { get; set; } // 0
+    public string AltAssetTag { get; set; } // "(blank), IMSA, NEC, NOTC, PMNA, INDY, NOABSTC, NOABS, ROOKIE, WSC2017, DTM"
     public string BuildType { get; set; } // Release
     public string BuildTarget { get; set; } // Members
     public string BuildVersion { get; set; } // 2020.12.08.06

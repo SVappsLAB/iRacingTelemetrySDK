@@ -14,15 +14,10 @@ public class IBTYamlValidation
 
     public IBTYamlValidation(ITestOutputHelper output) => _output = output;
 
-    [Fact]
+    [Fact(Explicit = true)]
     public async Task ValidateYamlInAllIbtFiles()
     {
-        // skip if directory doesn't exist
-        if (!Directory.Exists(TelemetryDir))
-        {
-            _output.WriteLine($"skipping: telemetry directory not found: {TelemetryDir}");
-            return;
-        }
+        Assert.SkipUnless(Directory.Exists(TelemetryDir), $"telemetry directory not found: {TelemetryDir}");
 
         var ibtFiles = Directory.GetFiles(TelemetryDir, "*.ibt");
         Assert.True(ibtFiles.Length > 0, "no IBT files found");
