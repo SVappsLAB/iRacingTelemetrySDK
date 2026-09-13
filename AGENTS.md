@@ -24,7 +24,7 @@ dotnet run --project .\Sdk\tests\SmokeTests\SmokeTests.csproj -- --filter-trait 
 dotnet pack .\Sdk\SVappsLAB.iRacingTelemetrySDK\SVappsLAB.iRacingTelemetrySDK.csproj
 ```
 
-Run `Category=live` smoke tests only with iRacing running in an active Windows session. Run `Category=manual` tests only when the local developer setup matches the test requirements.
+`Category=live` smoke tests need iRacing running in an active Windows session; without it they report as skipped (via `Assert.SkipUnless`), not failed. `Category=manual` tests are marked `Explicit = true`, so they never run by default - add `--explicit on` to run them, and only when the local developer setup matches the test requirements.
 
 `global.json` pins `test.runner` to `Microsoft.Testing.Platform`, so `dotnet test` needs `--project`/`--solution` (a bare positional path is rejected) and does not understand VSTest-style `--filter`. Use `dotnet run --project`, not `dotnet test`, for `SmokeTests` - its `launchSettings.json` injects a default `--filter-class` that `dotnet test` combines with (rather than overrides with) any `--filter-trait` you add, silently yielding "zero tests ran". See `Sdk/tests/README.md` for details.
 

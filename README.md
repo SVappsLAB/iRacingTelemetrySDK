@@ -370,10 +370,10 @@ dotnet test --project .\Sdk\tests\UnitTests\UnitTests.csproj
 # repeatable offline smoke tests using bundled IBT files
 dotnet run --project .\Sdk\tests\SmokeTests\SmokeTests.csproj -- --filter-trait Category=ibt
 
-# live smoke tests, requires an active iRacing session
+# live smoke tests, requires an active iRacing session (reported as skipped otherwise)
 dotnet run --project .\Sdk\tests\SmokeTests\SmokeTests.csproj -- --filter-trait Category=live
 
-# all test projects, including tests that may require live/manual setup
+# all test projects (live tests skip without iRacing; manual tests are explicit and do not run)
 dotnet test --solution .\Sdk\SVappsLAB.iRacingTelemetrySDK.slnx
 ```
 See [Sdk/tests/README.md](./Sdk/tests/README.md) for manual test commands and filtering notes.

@@ -14,6 +14,7 @@
  * limitations under the License.
 **/
 
+using System.IO.MemoryMappedFiles;
 using Microsoft.Extensions.Logging;
 using SVappsLAB.iRacingTelemetrySDK;
 
@@ -26,6 +27,27 @@ public class Live : Base<Live>
 
     public Live(ITestOutputHelper output) : base(output)
     {
+        Assert.SkipUnless(IsIRacingConnected(), "iRacing is not running with an active session");
+    }
+
+    static bool IsIRacingConnected()
+    {
+        const int STATUS_OFFSET = 4;    // irsdk_header.status follows the int 'ver' field
+        const int STATUS_CONNECTED = 1;
+
+        if (!OperatingSystem.IsWindows())
+            return false;
+
+        try
+        {
+            using var mmFile = MemoryMappedFile.OpenExisting(@"Local\IRSDKMemMapFileName");
+            using var accessor = mmFile.CreateViewAccessor(0, STATUS_OFFSET + sizeof(int), MemoryMappedFileAccess.Read);
+            return (accessor.ReadInt32(STATUS_OFFSET) & STATUS_CONNECTED) != 0;
+        }
+        catch (FileNotFoundException)
+        {
+            return false;
+        }
     }
 
     public static TheoryData<string, Func<ILogger, ITelemetryClient<TelemetryData>>> TestModes =>
