@@ -1,8 +1,8 @@
 # Architecture and Design
 
-This document describes the SDK's threading model, data pipeline, memory layout, buffering policy, and performance instrumentation.
+This document describes the SDK's threading model, data pipeline, memory layout, and buffering policy.
 
-For installation and everyday usage, see the [README](../README.md). For direct stream access and multi-consumer patterns, see [Advanced Usage](./ADVANCED.md).
+For installation and everyday usage, see the [README](../README.md). For direct stream access and multi-consumer patterns, see [Advanced Usage](./ADVANCED.md). For the runtime instrumentation the SDK publishes, see [Metrics and Diagnostics](./METRICS.md).
 
 ## Table of Contents
 
@@ -12,7 +12,7 @@ For installation and everyday usage, see the [README](../README.md). For direct 
 - [Compile-Time Code Generation](#compile-time-code-generation)
 - [Data Streaming and Buffering](#data-streaming-and-buffering)
 - [Performance Characteristics](#performance-characteristics)
-- [Performance Monitoring](#performance-monitoring)
+- [Metrics and Diagnostics](#metrics-and-diagnostics)
 
 ## Design Principles
 
@@ -249,63 +249,10 @@ Async mode supports handler-based consumption through `Monitor(handlers, ct)` an
 
 Actual throughput depends on the requested schema, consumer work, storage, and host hardware.
 
-## Performance Monitoring
+## Metrics and Diagnostics
 
-The SDK publishes runtime instrumentation through `System.Diagnostics.Metrics`.
-
-### Available Metrics
-
-Available instruments:
-
-- `telemetry_records_processed_total`: processed telemetry records
-- `telemetry_processing_duration_microseconds`: telemetry processing duration
-- `sessioninfo_records_processed_total`: processed session-info updates
-- `sessioninfo_processing_duration_milliseconds`: session-info processing duration
-
-### Enabling Metrics with Dependency Injection
-
-```csharp
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-
-[RequiredTelemetryVars([TelemetryVar.Speed, TelemetryVar.RPM])]
-public class Program
-{
-    public static async Task Main(string[] args)
-    {
-        var host = Host.CreateDefaultBuilder(args)
-            .ConfigureServices((context, services) =>
-            {
-                services.AddMetrics();
-                services.AddLogging(logging => logging.AddConsole());
-            })
-            .Build();
-
-        var logger = host.Services.GetRequiredService<ILogger<Program>>();
-        var meterFactory = host.Services.GetRequiredService<IMeterFactory>();
-
-        var clientOptions = new ClientOptions { MeterFactory = meterFactory };
-        await using var client = TelemetryClient<TelemetryData>.Create(logger, null, clientOptions);
-    }
-}
-```
-
-### Monitoring with dotnet-counters
-
-Any `System.Diagnostics.Metrics` consumer can collect these instruments. For example, `dotnet-counters` can attach to a running process:
-
-```bash
-# Monitor all SDK metrics for a running application named "YourApp"
-dotnet-counters monitor --name "YourApp" --counters SVappsLAB.iRacingTelemetrySDK
-
-# Sample output:
-# [SVappsLAB.iRacingTelemetrySDK]
-#     telemetry_records_processed_total                    45,231
-#     sessioninfo_records_processed_total                      12
-```
-
-Processing rates, latency distributions, and dropped-record counts identify whether the producer or a downstream consumer is the limiting stage.
+The SDK publishes runtime instrumentation through `System.Diagnostics.Metrics`. See
+[Metrics and Diagnostics](./METRICS.md) for the metric reference, OpenTelemetry and dependency-injection setup, `dotnet-counters` commands, and interpretation guidance.
 
 ## Related Documentation
 

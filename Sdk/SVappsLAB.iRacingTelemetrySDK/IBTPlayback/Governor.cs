@@ -27,6 +27,7 @@ internal interface IPlaybackGovernor
 {
     public void StartPlayback();
     public Task GovernSpeed(int recNum);
+    public void RecordLag(int recNum);
     public GovernorStats GetStats();
 }
 
@@ -40,11 +41,14 @@ internal class SimpleGovernor : IPlaybackGovernor
     TimeSpan _delayTimeSpan;            // current delay amount
     Stopwatch _stopwatch = new Stopwatch();
     GovernorStats? _governorStats;
+    readonly Action<TimeSpan>? _onPlaybackLag;
 
-    public SimpleGovernor(ILogger logger, int playbackSpeedMultiplier)
+    // onPlaybackLag is called from RecordLag with how far behind its scheduled time a record is being read
+    public SimpleGovernor(ILogger logger, int playbackSpeedMultiplier, Action<TimeSpan>? onPlaybackLag = null)
     {
         _logger = logger;
         _playbackSpeedMultiplier = playbackSpeedMultiplier;
+        _onPlaybackLag = onPlaybackLag;
         _adjustmentAmountInMs = STANDARD_MS_PER_RECORD / _playbackSpeedMultiplier / 5; // make delay +- changes in 5% increments
     }
 
@@ -80,6 +84,18 @@ internal class SimpleGovernor : IPlaybackGovernor
         }
         // slow down processing to match the playback speed
         return Task.Delay(_delayTimeSpan);
+    }
+
+    // reports how far behind its scheduled time a record is being read, zero when on time.
+    // nothing is reported at max speed, where there is no schedule
+    public void RecordLag(int recNum)
+    {
+        if (_onPlaybackLag == null || _playbackSpeedMultiplier == int.MaxValue)
+            return;
+
+        var dueMs = recNum * STANDARD_MS_PER_RECORD / _playbackSpeedMultiplier;
+        var lagMs = Math.Max(0, _stopwatch.Elapsed.TotalMilliseconds - dueMs);
+        _onPlaybackLag(TimeSpan.FromMilliseconds(lagMs));
     }
 
     void CalculateGoverningDelay(int currentRecNum)

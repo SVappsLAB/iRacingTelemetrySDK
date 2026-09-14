@@ -9,7 +9,13 @@ jobs:
       run:
         working-directory: Sdk
     steps:
-      - uses: actions/checkout@v2
+      # not 'lfs: true' - that pulls every lfs object at HEAD (~319MB)
+      - uses: actions/checkout@v4
+
+      # the unit tests play back a real ibt file
+      - name: fetch ibt test data
+        working-directory: ${{ github.workspace }}
+        run: git lfs pull --include "Sdk/tests/SmokeTests/data/ibt/raygr22_roadatlanta full 2025-07-15.ibt"
 
       - name: setup
         uses: actions/setup-dotnet@v4
@@ -23,7 +29,8 @@ jobs:
       - name: unit tests
         run: dotnet run --no-restore -c release --project ./tests/UnitTests/UnitTests.csproj
 
-    # can't run IBT tests with github runers - because we don't have
-    # access to memory mapped files on the host
+    # the ibt smoke tests are not run here. they do pass headlessly on a runner (they
+    # only read ibt files - no iRacing needed), but the 3 files they sweep are ~191MB
+    # of lfs data per run. to enable, fetch them above and add:
     # - name: ibt tests
-    #   run: dotnet test --no-restore -c release --filter IBT_Tests
+    #   run: dotnet run --no-restore -c release --no-launch-profile --project ./tests/SmokeTests/SmokeTests.csproj -- --filter-trait "Category=ibt"

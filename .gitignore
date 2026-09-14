@@ -1,7 +1,9 @@
 *.user
 .vs
+TestResults/
 artifacts/
 bin/
 dist/
 obj/
+
 

@@ -19,6 +19,7 @@ Perfect for building **real-time dashboards**, **data analysis tools**, **race e
 - [Samples](#samples)
 - [Advanced Usage](./docs/ADVANCED.md)
 - [Architecture and Design](./docs/ARCHITECTURE.md)
+- [Metrics and Diagnostics](./docs/METRICS.md)
 - [Documentation](#documentation)
 - [AI-Assisted Development](#ai-assisted-development)
 - [Building from Source](#building-from-source)
@@ -28,6 +29,7 @@ Perfect for building **real-time dashboards**, **data analysis tools**, **race e
 
 - **Type Safety**: Enum-based telemetry variables with IntelliSense support and compile-time validation
 - **High Performance**: Processes 600,000+ telemetry records/second with lock-free data streaming architecture
+- **Low Per-Frame Overhead**: Under 0.01 ms of SDK work per telemetry update - leaving over 99.9% of iRacing's 16.67 ms (60 Hz) frame budget to your code
 - **Background Processing**: Dedicated threads for telemetry collection and processing - your app's processing speed never blocks the streaming telemetry data
 - **Live Telemetry**: Real-time access to 200+ variables including speed, RPM, tire data during iRacing sessions
 - **IBT File Playback**: Analyze historical telemetry using the same API as live data
@@ -65,7 +67,7 @@ This SDK takes a different approach. It treats telemetry as a **typed, high-thro
 - **Minimal-allocation reads** — each sample is copied once into a reused buffer (guarding against iRacing overwriting it mid-read), then decoded field-by-field via `ReadOnlySpan<T>` with no further allocations, keeping steady-state GC pressure near zero
 - **Independent background tasks** mean CPU-intensive session-info YAML parsing never stalls the 60Hz telemetry path
 
-Full details, including the threading model, buffering semantics, and built-in metrics: **[Architecture and Design](./docs/ARCHITECTURE.md)**
+Full details on the threading model and buffering semantics: **[Architecture and Design](./docs/ARCHITECTURE.md)**. For the built-in metrics and how to collect them: **[Metrics and Diagnostics](./docs/METRICS.md)**
 
 ## Requirements
 
@@ -319,13 +321,15 @@ sim.Camera.SwitchToCar("001", cameraGroup: 1, camera: 1);
 See [Samples Directory](./Samples/README.md) for ready-to-run example projects including:
 - Basic telemetry monitoring
 - IBT file analysis
+- Collecting the SDK's built-in metrics
 - Simulator control, including cameras, replay, pit service, and broadcast commands
 - Data export utilities
 - Track analysis tools
 
 ## Documentation
 
-- **[Architecture and Design](./docs/ARCHITECTURE.md)** - Threading model, data streaming and buffering, performance characteristics, and built-in metrics
+- **[Architecture and Design](./docs/ARCHITECTURE.md)** - Threading model, data streaming and buffering, and performance characteristics
+- **[Metrics and Diagnostics](./docs/METRICS.md)** - Instrument reference, OpenTelemetry and DI setup, collection, and interpretation
 - **[Advanced Usage](./docs/ADVANCED.md)** - Direct stream access, multiple consumers, and cancellation behavior
 - **[Migration Guide](./docs/MIGRATION_GUIDE.md)** - Upgrading from early pre-1.0 releases
 
