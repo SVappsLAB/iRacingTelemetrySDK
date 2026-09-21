@@ -15,6 +15,21 @@ All samples define a `TelemetryHandlers<TelemetryData>` variable and pass it to 
     Same shape as MinimalExampleAsync, but looks up telemetry variables dynamically with `GetValue("<var>")` instead of a strongly-typed property.
     Synchronous mode allows you to query for any variable, at runtime, at the cost of throughput. See [SDK_REFERENCE.md](../docs/ai/SDK_REFERENCE.md#telemetry-delivery-mode) for details on the tradeoffs.
 
+* [Metrics](./Metrics/)
+
+    Two samples that collect the SDK's built-in metrics, one for each of the common ways to consume them. They are identical apart from collection.
+
+    * [MeterListener](./Metrics/MeterListener/) - subscribes to the SDK meter by name and aggregates every measurement itself. No DI, no OpenTelemetry, no extra packages.
+    * [OpenTelemetry](./Metrics/OpenTelemetry/) - subscribes and uses a console exporter to print real bucketed histograms. Swap in `.AddOtlpExporter()` for a collector, Prometheus, or Grafana.
+
+    ```bash
+    dotnet run                             # live
+    dotnet run <file.ibt>                  # replay, max speed
+    dotnet run <file.ibt> 1                # replay at recorded speed, so playback.lag is recorded too
+    ```
+
+    See the [Metrics README](./Metrics/) for what is collected, what each instrument means and how to interpret it.
+
 * [DumpVariables_DumpSessionInfo](./DumpVariables_DumpSessionInfo/)
 
     Connects to a session (live or IBT file)

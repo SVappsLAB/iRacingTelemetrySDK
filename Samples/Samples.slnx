@@ -2,6 +2,11 @@
   <Folder Name="/data/">
     <File Path="data/formulair04_tsukuba 2kfull 2024-01-09 17-26-10.ibt" />
   </Folder>
+  <Folder Name="/Metrics/">
+    <File Path="Metrics/README.md" />
+    <Project Path="Metrics/MeterListener/MeterListener.csproj" />
+    <Project Path="Metrics/OpenTelemetry/OpenTelemetry.csproj" />
+  </Folder>
   <Folder Name="/Solution Items/">
     <File Path="README.md" />
   </Folder>

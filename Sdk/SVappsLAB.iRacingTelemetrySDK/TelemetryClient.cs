@@ -164,7 +164,7 @@ public class TelemetryClient<T> : ITelemetryClient<T>, IAsyncDisposable where T 
     readonly Channel<Exception> _errorChannel;
     readonly Channel<string> _rawSessionDataChannel;
     readonly Channel<TelemetrySessionInfo> _sessionDataChannel;
-    readonly Channel<T> _telemetryDataChannel;
+    readonly Channel<StampedSample<T>> _telemetryDataChannel;
     readonly Channel<string> _internalSessionInfoChannel;
     IMetricsService? _metricsService;
     Task<int>? _dataProcessingTask;
@@ -255,8 +255,31 @@ public class TelemetryClient<T> : ITelemetryClient<T>, IAsyncDisposable where T 
 
     private async IAsyncEnumerable<T> GetTelemetryDataEnumerable([EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        await foreach (var item in _telemetryDataChannel.Reader.ReadAllAsync(cancellationToken))
-            yield return item;
+        await foreach (var stamped in GetStampedTelemetryDataEnumerable(cancellationToken))
+            yield return stamped.Sample;
+    }
+
+    // the metered side of the telemetry stream. both async paths read through here - the handler
+    // loop and the public TelemetryData stream - so they report the same measurements
+    private async IAsyncEnumerable<StampedSample<T>> GetStampedTelemetryDataEnumerable([EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        await foreach (var stamped in _telemetryDataChannel.Reader.ReadAllAsync(cancellationToken))
+        {
+            var meters = _metricsService?.Telemetry;
+            var handlerStart = meters?.RecordHandoff(stamped.AcquiredTimestamp) ?? TelemetryMeters.NotTiming;
+
+            // an iterator only resumes past its yield when the consumer asks for the next record.
+            // this span is exactly the consumer's work duration.
+            // the finally covers a consumer breaking out of its loop, which disposes the enumerator instead of resuming it
+            try
+            {
+                yield return stamped;
+            }
+            finally
+            {
+                meters?.RecordConsumed(stamped.AcquiredTimestamp, handlerStart);
+            }
+        }
     }
 
     /// <summary>
@@ -320,9 +343,13 @@ public class TelemetryClient<T> : ITelemetryClient<T>, IAsyncDisposable where T 
         };
         _connectStateChannel = Channel.CreateBounded<ConnectState>(boundedChannelOptions);
         _errorChannel = Channel.CreateBounded<Exception>(boundedChannelOptions);
-        _rawSessionDataChannel = Channel.CreateBounded<string>(boundedChannelOptions);
-        _sessionDataChannel = Channel.CreateBounded<TelemetrySessionInfo>(boundedChannelOptions);
-        _telemetryDataChannel = Channel.CreateBounded<T>(boundedChannelOptions);
+        _rawSessionDataChannel = Channel.CreateBounded<string>(
+            boundedChannelOptions, _ => _metricsService?.SessionInfo.SessionDataYamlOverflow(1));
+        _sessionDataChannel = Channel.CreateBounded<TelemetrySessionInfo>(
+            boundedChannelOptions, _ => _metricsService?.SessionInfo.SessionDataOverflow(1));
+        // a slow async consumer loses the oldest records rather than stalling the producer - count them
+        _telemetryDataChannel = Channel.CreateBounded<StampedSample<T>>(
+            boundedChannelOptions, _ => _metricsService?.Telemetry.ConsumerOverflow(1));
 
         // Internal session info processing channel
         var sessionInfoChannelOptions = new BoundedChannelOptions(10)
@@ -331,12 +358,14 @@ public class TelemetryClient<T> : ITelemetryClient<T>, IAsyncDisposable where T 
             SingleReader = true,
             SingleWriter = false // Both Live and IBT can write
         };
-        _internalSessionInfoChannel = Channel.CreateBounded<string>(sessionInfoChannelOptions);
+        // updates arriving faster than they can be parsed are evicted unparsed - count them
+        _internalSessionInfoChannel = Channel.CreateBounded<string>(
+            sessionInfoChannelOptions, _ => _metricsService?.SessionInfo.ParseBacklogOverflow(1));
 
         // initialize data provider
-        _dataProvider = _ibtOptions == null ? new LiveDataProvider(_logger) : new IBTDataProvider(_logger, _ibtOptions);
+        _dataProvider = _ibtOptions == null ? new LiveDataProvider(_logger, RecordMissedTicks) : new IBTDataProvider(_logger, _ibtOptions, RecordPlaybackLag);
 
-        _metricsService = new MetricsService(clientOptions?.MeterFactory, _ibtOptions == null ? "Live" : "IBT");
+        _metricsService = new MetricsService(clientOptions?.MeterFactory, _ibtOptions == null ? "live" : "ibt");
 
         _telemetryAccessor = new TelemetryDataAccessor<T>(_logger);
         _sessionInfoParser = new YamlParser(_logger);
@@ -528,9 +557,9 @@ public class TelemetryClient<T> : ITelemetryClient<T>, IAsyncDisposable where T 
 
     private async Task HandleTelemetryData(Func<T, Task> handler)
     {
-        await foreach (var data in TelemetryData.ConfigureAwait(false))
+        await foreach (var stamped in GetStampedTelemetryDataEnumerable().ConfigureAwait(false))
         {
-            await handler(data).ConfigureAwait(false);
+            await handler(stamped.Sample).ConfigureAwait(false);
         }
     }
 
@@ -842,6 +871,12 @@ public class TelemetryClient<T> : ITelemetryClient<T>, IAsyncDisposable where T 
     }
     private bool IsOnlineMode => _ibtOptions == null;
 
+    private void RecordMissedTicks(long count) => _metricsService?.Telemetry.TicksMissed(count);
+
+    private void RecordPlaybackLag(TimeSpan lag) => _metricsService?.Playback.RecordLag(lag);
+
+    private long MarkAcquired() => _metricsService?.Telemetry.MarkAcquired() ?? TelemetryMeters.NotTiming;
+
     private async Task ProcessSessionInfoChannel(CancellationToken ct)
     {
         _logger.LogDebug("Session info processor started");
@@ -885,20 +920,22 @@ public class TelemetryClient<T> : ITelemetryClient<T>, IAsyncDisposable where T 
 
     private TelemetrySessionInfo? ParseSessionInfo(string rawSessionInfoYaml)
     {
-        using var timer = new ScopeTimeSpanTimer(elapsed => _metricsService?.SessionInfo.ProcessingDuration(elapsed));
-        using var counter = new ScopeLambda(() => _metricsService?.SessionInfo.RecordsProcessed(1));
-
         TelemetrySessionInfo? sessionInfo = null;
+        // a full pass over the yaml, but it's trivial
+        var sizeBytes = System.Text.Encoding.UTF8.GetByteCount(rawSessionInfoYaml);
+        var startTimestamp = Stopwatch.GetTimestamp();
         try
         {
-            Stopwatch sw = Stopwatch.StartNew();
-
             var parseResult = _sessionInfoParser.Parse<TelemetrySessionInfo>(rawSessionInfoYaml);
             sessionInfo = parseResult.Model;
-            _logger.LogDebug("sessionInfo deserialize complete. required {attempts} attempts. ({ScopeTimeSpanTimer}ms)", parseResult.ParseAttemptsRequired, sw.ElapsedMilliseconds);
+
+            var elapsed = Stopwatch.GetElapsedTime(startTimestamp);
+            _metricsService?.SessionInfo.RecordProcessed(elapsed, sizeBytes, parseResult.ParseAttemptsRequired);
+            _logger.LogDebug("sessionInfo deserialize complete. required {attempts} attempts. ({elapsedMs}ms)", parseResult.ParseAttemptsRequired, (long)elapsed.TotalMilliseconds);
         }
         catch (Exception e)
         {
+            _metricsService?.SessionInfo.RecordFailed(Stopwatch.GetElapsedTime(startTimestamp), sizeBytes, e);
             _logger.LogError(e, "error deserializing or sending sessionTelemetryInfo event");
             _errorChannel.Writer.TryWrite(e);
         }
@@ -1018,10 +1055,13 @@ public class TelemetryClient<T> : ITelemetryClient<T>, IAsyncDisposable where T 
             return false;
         }
 
+        // taken before decoding, so decode cost lands inside every pipeline measurement
+        var acquiredTimestamp = MarkAcquired();
+
         // suppress events if paused or disposed
         if (!IsPaused)
         {
-            await DeliverTelemetryData(GetTelemetryDataSample()).ConfigureAwait(false);
+            await DeliverTelemetryData(new(GetTelemetryDataSample(), acquiredTimestamp)).ConfigureAwait(false);
         }
 
         return true;	// data processed
@@ -1029,38 +1069,58 @@ public class TelemetryClient<T> : ITelemetryClient<T>, IAsyncDisposable where T 
 
     private T GetTelemetryDataSample()
     {
-        using var elapsedTimer = new ScopeTimeSpanTimer(elapsed => _metricsService?.Telemetry.ProcessingDuration(elapsed));
-        using var counter = new ScopeLambda(() => _metricsService?.Telemetry.RecordsProcessed(1));
+        // hot path
+        var meters = _metricsService?.Telemetry;
+        var startTimestamp = meters?.StartTiming() ?? TelemetryMeters.NotTiming;
 
-        T val = _telemetryAccessor.CreateTelemetryDataSample(_dataProvider);
+        T val;
+        try
+        {
+            val = _telemetryAccessor.CreateTelemetryDataSample(_dataProvider);
+        }
+        catch (Exception ex)
+        {
+            meters?.RecordFailed(startTimestamp, ex);
+            throw;
+        }
+
+        meters?.RecordProcessed(startTimestamp);
         return val;
     }
 
     // keep this method synchronous to avoid building an async
-    private Task DeliverTelemetryData(T telemetryData)
+    private Task DeliverTelemetryData(StampedSample<T> stamped)
     {
         if (_deliveryMode == TelemetryDeliveryMode.Synchronous)
         {
             return _syncTelemetryHandler != null
-                ? InvokeSyncTelemetryHandler(telemetryData)
+                ? InvokeSyncTelemetryHandler(stamped)
                 : Task.CompletedTask;
         }
 
-        _telemetryDataChannel.Writer.TryWrite(telemetryData);
+        _telemetryDataChannel.Writer.TryWrite(stamped);
         return Task.CompletedTask;
     }
 
-    private async Task InvokeSyncTelemetryHandler(T telemetryData)
+    private async Task InvokeSyncTelemetryHandler(StampedSample<T> stamped)
     {
+        // no queue in synchronous mode, so sdk latency is only decode cost. recorded anyway,
+        // so the sync/async tradeoff shows up in the data instead of having to be inferred
+        var meters = _metricsService?.Telemetry;
+        var handlerStart = meters?.RecordHandoff(stamped.AcquiredTimestamp) ?? TelemetryMeters.NotTiming;
         try
         {
-            await _syncTelemetryHandler!(telemetryData).ConfigureAwait(false);
+            await _syncTelemetryHandler!(stamped.Sample).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
             // this is the caller's handler exception, not an SDK/provider error - wrap it so
             // catch blocks fault Monitor() instead of treating it as a retryable error routed to OnError
             throw new SyncHandlerFaultException(ex);
+        }
+        finally
+        {
+            meters?.RecordConsumed(stamped.AcquiredTimestamp, handlerStart);
         }
     }
     private async Task<int> ProcessIbtData(CancellationToken token)
@@ -1103,10 +1163,13 @@ public class TelemetryClient<T> : ITelemetryClient<T>, IAsyncDisposable where T 
                     break;
                 }
 
+                // taken before decoding, so decode cost lands inside pipeline measurement
+                var acquiredTimestamp = MarkAcquired();
+
                 // suppress events if paused or disposed
                 if (!IsPaused)
                 {
-                    await DeliverTelemetryData(GetTelemetryDataSample()).ConfigureAwait(false);
+                    await DeliverTelemetryData(new(GetTelemetryDataSample(), acquiredTimestamp)).ConfigureAwait(false);
                 }
 
                 // Apply playback speed delay if configured

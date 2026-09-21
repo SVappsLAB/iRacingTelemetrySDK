@@ -6,6 +6,7 @@ High-performance .NET SDK for accessing **live telemetry data** from iRacing sim
 
 - **Type Safety**: Enum-based telemetry variables with IntelliSense/Copilot support and compile-time validation
 - **High Performance**: Processes 600,000+ telemetry records/second with lock-free data streaming architecture
+- **Low Per-Frame Overhead**: Under 0.01 ms of SDK work per telemetry update - leaving over 99.9% of iRacing's 16.67 ms (60 Hz) frame budget to your code
 - **Background Processing**: Dedicated threads for telemetry collection and processing - your app's processing speed never blocks the streaming telemetry data
 - **Modern Async API**: Async data streams with async/await patterns, bounded buffering, and automatic overload handling
 - **Dynamic Variable Lookup**: Look up any telemetry variable by name at runtime with `GetValue(string)` - no compile-time struct required

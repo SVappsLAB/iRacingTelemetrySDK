@@ -1,6 +1,8 @@
 <Solution>
   <Folder Name="/docs/">
     <File Path="../docs/ADVANCED.md" />
+    <File Path="../docs/ARCHITECTURE.md" />
+    <File Path="../docs/METRICS.md" />
     <File Path="../docs/MIGRATION_GUIDE.md" />
   </Folder>
   <Folder Name="/docs/ai/">
@@ -10,9 +12,6 @@
   <Folder Name="/Solution Items/">
     <File Path="../AGENTS.md" />
     <File Path="../CLAUDE.md" />
-    <File Path="../docs/ADVANCED.md" />
-    <File Path="../docs/ARCHITECTURE.md" />
-    <File Path="../docs/MIGRATION_GUIDE.md" />
     <File Path="../NUGET.md" />
     <File Path="../README.md" />
   </Folder>

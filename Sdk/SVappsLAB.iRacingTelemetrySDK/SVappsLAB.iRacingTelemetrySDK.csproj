@@ -43,7 +43,7 @@
     <PackageTags>iRacing iRacingSDK irsdk IBT telemetry SDK API sim-control replay broadcast</PackageTags>
     <PackageReadmeFile>NUGET.md</PackageReadmeFile>
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
-    <Version>2.4.0</Version>
+    <Version>2.5.0</Version>
     <Authors>Scott Velez</Authors>
     <Company>SVappsLAB</Company>
     <Copyright>Copyright (c) 2026 SVappsLAB</Copyright>

@@ -1,12 +1,12 @@
 /**
  * Copyright (C) 2024-2026 Scott Velez
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -14,22 +14,10 @@
  * limitations under the License.
 **/
 
-using System;
+namespace SVappsLAB.iRacingTelemetrySDK;
 
-namespace SVappsLAB.iRacingTelemetrySDK.Metrics;
-
-internal class ScopeTimeSpanTimer : IDisposable
-{
-    long _timeStamp;
-    readonly Action<TimeSpan> _lambda;
-    public ScopeTimeSpanTimer(Action<TimeSpan> lambda)
-    {
-        _lambda = lambda;
-        _timeStamp = TimeProvider.System.GetTimestamp();
-    }
-    public void Dispose()
-    {
-        var elapsed = TimeProvider.System.GetElapsedTime(_timeStamp);
-        _lambda(elapsed);
-    }
-}
+// what travels through the internal telemetry channel: one record plus when it was acquired.
+// TData is the caller's source-generated struct. the timestamp rides with it and is
+// unwrapped before delivery - the public stream still yields plain TData.
+// AcquiredTimestamp is TelemetryMeters.NotTiming when no pipeline instrument is being collected
+internal readonly record struct StampedSample<TData>(TData Sample, long AcquiredTimestamp);

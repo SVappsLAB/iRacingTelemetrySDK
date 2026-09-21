@@ -26,6 +26,15 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- linked rather than copied - a real IBT file is the only way to exercise the full
+         acquire/create/handoff/handler pipeline that the latency metrics measure -->
+    <Content Include="..\SmokeTests\data\ibt\raygr22_roadatlanta full 2025-07-15.ibt">
+      <Link>data\ibt\metrics-playback.ibt</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- for running the source generator in-process (CodeGenTests) -->
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.9.0" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.12" />

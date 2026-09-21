@@ -30,10 +30,14 @@ internal unsafe class LiveDataProvider : DataProviderBase, IDataProvider
 
     int _dataDropCount = 0;
     int _lastTickCount = 0; // latest tick count iRacing wrote to
+    readonly Action<long>? _onMissedTicks;
     AutoResetEvent? _dataReadyEvent;
 
-    public LiveDataProvider(ILogger logger) : base(logger)
+    // onMissedTicks is called with the number of ticks iRacing wrote that were never read,
+    // each time a gap is detected
+    public LiveDataProvider(ILogger logger, Action<long>? onMissedTicks = null) : base(logger)
     {
+        _onMissedTicks = onMissedTicks;
     }
 
     public override void OpenDataSource()
@@ -67,13 +71,14 @@ internal unsafe class LiveDataProvider : DataProviderBase, IDataProvider
             return false;
         }
 
-        // if we missed any telemetry data, log that it happened
+        // if we missed any telemetry data, log and count it
         if (latestTickCount > _lastTickCount)
         {
             var tickDiff = latestTickCount - _lastTickCount - 1;
             if (_lastTickCount != 0 && tickDiff > 0)
             {
                 _dataDropCount += tickDiff;
+                _onMissedTicks?.Invoke(tickDiff);
                 _logger.LogWarning("dropped {count} data records. a total of {total} missed so far. last tick: {lastTick}, current tick: {currentTick}", tickDiff, _dataDropCount, _lastTickCount, latestTickCount);
             }
         }
