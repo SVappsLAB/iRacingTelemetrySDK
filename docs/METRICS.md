@@ -14,6 +14,8 @@ For the threading model and buffering policy these instruments measure, see [Arc
 - [Dependency Injection](#dependency-injection)
 - [Monitoring with dotnet-counters](#monitoring-with-dotnet-counters)
 - [Live-Session Example](#live-session-example)
+  - [Baseline: a fast synchronous consumer](#baseline-a-fast-synchronous-consumer)
+  - [When the consumer is too slow](#when-the-consumer-is-too-slow)
 
 ## Available Metrics
 
@@ -59,6 +61,8 @@ Each histogram provides bucket boundaries suited to what it measures, so exporte
 | `telemetry.sample.interval` | p50 15.5 ms, p99 31 ms | 10 µs to 1 s |
 | `playback.lag` | p50 7.0 ms, p99 15 ms, max 298 ms | 500 µs to 30 s |
 
+A later live run - the one in [Live-Session Example](#baseline-a-fast-synchronous-consumer) - stayed inside every one of these ranges, its widest outliers being a 4.879 ms `total.duration` and a 65.178 ms `sample.interval`.
+
 `sdk.duration` and `total.duration` share boundaries so they can be compared bucket for bucket; their difference is the consumer's handler cost. The telemetry clocks are read only while a listener collects a histogram that needs them, so the hot path costs nothing extra when metrics are not collected.
 
 ## Telemetry Pipeline Latency
@@ -93,7 +97,7 @@ acquire(n-1) ────── sample.interval ──────► acquire(n)
 - **`total.duration` is a latency.** It lives entirely inside one record: that record's acquisition until the handler returned for that same record. It answers *how long did this record take to process*.
 - **`sample.interval` is a cadence.** It spans two records and ignores what happened to either one. It answers *how often are records arriving*. A consumer whose handler does nothing at all still records the same intervals.
 
-In a healthy live session the two differ by roughly three orders of magnitude - about 0.02 ms of work inside each 15.5 ms frame. That ratio, rather than either number on its own, is the processing headroom.
+In a healthy live session the two differ by roughly three orders of magnitude - about 0.008 ms of work inside each 16.7 ms frame, [measured below](#baseline-a-fast-synchronous-consumer). That ratio, rather than either number on its own, is the processing headroom.
 
 Reading them together isolates the slow stage:
 
@@ -116,7 +120,7 @@ Interpret the values as follows:
 
 - **Live**: `telemetry.sample.interval` should sit near 0.01667 s (60 Hz). A distribution split between one and two frames means ticks are being missed, which also appears as `missed_tick` drops. `telemetry.total.duration` says nothing about this; it stays flat while frames are being dropped.
 - **Async delivery**: a rising `telemetry.sdk.duration` means records are waiting in the delivery buffer behind the consumer. If the consumer stays behind, `consumer_overflow` drops follow.
-- **Synchronous delivery**: there is no buffer, so `sdk.duration` collapses to decode cost and `total.duration` is roughly decode plus handler. A slow handler shows up as handler time and `missed_tick` drops rather than SDK time.
+- **Synchronous delivery**: there is no buffer, so `sdk.duration` falls to decode cost plus the handoff itself - measured at roughly twice decode - and `total.duration` is roughly decode plus handler. A slow handler shows up as handler time and `missed_tick` drops rather than SDK time.
 - **IBT at max speed** (the default `PlayBackSpeedMultiplier`): there is no schedule to keep, so `sample.interval` measures how fast the file is being consumed rather than a 60 Hz cadence; it and `sdk.duration` describe throughput, not real-time latency. At a paced speed both behave like live.
 - **Async delivery with no consumer**: a client that neither sets `OnTelemetryUpdate` nor enumerates `TelemetryData` never records `sdk.duration`, `handler.duration`, or `total.duration`.
 
@@ -130,6 +134,8 @@ services.AddOpenTelemetry()
 ```
 
 Configure the exporter appropriate to the application separately. The SDK publishes metrics; it does not configure an OpenTelemetry exporter or collector.
+
+The [OpenTelemetry sample](../Samples/Metrics/OpenTelemetry/) is a runnable version of this, using a console exporter so it needs no collector. Subscribing by meter name needs neither DI nor an `IMeterFactory`.
 
 ## Dependency Injection
 
@@ -179,7 +185,34 @@ dotnet-counters collect --counters SVappsLAB.iRacingTelemetrySDK --format csv -o
 
 ## Live-Session Example
 
-The following one-second snapshots are from the same live iRacing session, consumed three ways. Slow handlers wait 50 ms per record, so they can handle about 16 records per second against iRacing's 60 Hz.
+### Baseline: a fast synchronous consumer
+
+A report from the [MeterListener sample](../Samples/Metrics/MeterListener/) against a live iRacing session: synchronous delivery, and a handler that does two `GetValue()` calls. The run covered 12,704 records, about three and a half minutes.
+
+```
+--- metrics ---
+  session_info.parse.attempts                                            26 recorded   avg          1 {attempt}   max          1 {attempt}
+  session_info.process.duration                                          26 recorded   avg    9.283 ms   max   60.118 ms
+  session_info.records.processed                                         26 {record}
+  session_info.size                                                      26 recorded   avg     54,772 By   max     56,027 By
+  telemetry.decode.duration                                          12,704 recorded   avg      3.2 us   max    1.380 ms
+  telemetry.handler.duration                                         12,704 recorded   avg      0.8 us   max    253.5 us
+  telemetry.records.processed                                        12,704 {record}
+  telemetry.sample.interval                                          12,703 recorded   avg   16.680 ms   max   65.178 ms
+  telemetry.sdk.duration                                             12,704 recorded   avg      6.2 us   max    2.362 ms
+  telemetry.total.duration                                           12,704 recorded   avg      7.6 us   max    4.879 ms
+```
+
+- **Cadence**: `telemetry.sample.interval` averaged 16.680 ms - 59.95 Hz, iRacing's 60 Hz. Consecutive five-second reports each added exactly 300 records.
+- **Headroom**: 7.6 µs of end-to-end work inside a 16.68 ms frame is about 0.05% of the frame; the rest is the consumer's to spend.
+- **Where the time goes**: `sdk.duration` 6.2 µs, of which `decode.duration` is 3.2 µs, and the handler's two `GetValue()` calls 0.8 µs. Synchronous delivery has no buffer, so the SDK's remaining share is handoff rather than queueing. The 0.6 µs by which `sdk` plus `handler` falls short of `total` is the cost of recording `sdk.duration` itself, which lands between the two clock reads - the price of collecting, not of the pipeline.
+- **Nothing was dropped**: neither `records.dropped` counter appears at all. A `MeterListener` prints only instruments that recorded something, so an absent row is a zero.
+- **The outliers are the source, not the pipeline**: the widest `sample.interval` was 65.178 ms, about four frames, yet no `missed_tick` drops were counted. Missed ticks come from iRacing's own tick counter, so zero means the sim wrote nothing during that gap rather than the read loop falling behind.
+- **Session info**: 26 updates, roughly one every eight seconds, averaging 53 KiB and 9.283 ms to parse. Parsing runs off the telemetry path, so even the 60.118 ms outlier costs the telemetry pipeline nothing. `parse.attempts` never exceeded 1, so no YAML needed repairing.
+
+### When the consumer is too slow
+
+The following one-second snapshots are from a live iRacing session, consumed three ways. Slow handlers wait 50 ms per record, so they can handle about 16 records per second against iRacing's 60 Hz.
 
 | Consumer | `records.processed` | `records.dropped` | `drop.reason` | `telemetry.decode.duration` p50 / p95 / p99 |
 |----------|---------------------|-------------------|---------------|------------------------------------------------|
