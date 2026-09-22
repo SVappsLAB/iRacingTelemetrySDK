@@ -35,7 +35,7 @@ Perfect for building **real-time dashboards**, **data analysis tools**, **race e
 - **IBT File Playback**: Analyze historical telemetry using the same API as live data
 - **Modern Async API**: Async data streams with bounded buffering and automatic overload handling
 - **Dynamic Variable Lookup**: Look up any telemetry variable by name at runtime via `GetValue(string)` - useful when the variable set isn't known at compile time
-- **Built-in Metrics**: Integrated performance monitoring via System.Diagnostics.Metrics
+- **Built-in Metrics**: Integrated performance monitoring via System.Diagnostics.Metrics - see [Metrics and Diagnostics](./docs/METRICS.md), including a dashboard example
 - **Pause and Resume**: Control data flow while background processing continues
 - **Sim Control**: Remotely control the simulator (pit commands, replay, cameras, chat, and more)
 

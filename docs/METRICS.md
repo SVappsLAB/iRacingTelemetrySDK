@@ -137,6 +137,12 @@ Configure the exporter appropriate to the application separately. The SDK publis
 
 The [OpenTelemetry sample](../Samples/Metrics/OpenTelemetry/) is a runnable version of this, using a console exporter so it needs no collector. Subscribing by meter name needs neither DI nor an `IMeterFactory`.
 
+Exported over OTLP instead, the same instruments become dashboard panels - the counters as throughput and error totals, the duration histograms as latency distributions and heatmaps:
+
+![SDK metrics exported over OTLP and viewed in Grafana](./images/sdk-grafana.png)
+
+NOTE: The SDK does not ship this dashboard (example only), but it was built from the instrument names in [Available Metrics](#available-metrics), `.AddOtlpExporter()` and Grafana.
+
 ## Dependency Injection
 
 Pass the application's `IMeterFactory` to the client so the SDK creates its meter through the DI container:
