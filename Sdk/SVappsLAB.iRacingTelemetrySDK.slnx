@@ -16,6 +16,7 @@
     <File Path="../README.md" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/AotSmokeTest/AotSmokeTest.csproj" />
     <Project Path="tests/SmokeTests/SmokeTests.csproj" />
     <Project Path="tests/UnitTests/UnitTests.csproj" />
   </Folder>

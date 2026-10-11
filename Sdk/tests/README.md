@@ -16,6 +16,14 @@ IBT smoke tests use bundled `.ibt` files under `Sdk/tests/SmokeTests/data/ibt` a
 dotnet run --project .\Sdk\tests\SmokeTests\SmokeTests.csproj -- --filter-trait Category=ibt
 ```
 
+## Native AOT Smoke Tests
+
+`AotSmokeTest` is a console app published with native AOT.
+
+```powershell
+dotnet run --project .\Sdk\tests\SmokeTests\SmokeTests.csproj -- --filter-trait Category=aot
+```
+
 ## Live Smoke Tests
 
 Live tests require iRacing running on Windows in an active session. Load a track and car, get into the car so the simulator sends telemetry data, then run:
@@ -40,7 +48,7 @@ dotnet run --project .\Sdk\tests\UnitTests\UnitTests.csproj -- --filter-trait Ca
 
 ## All Tests
 
-The full solution test run skips live tests when iRacing isn't running and never runs explicit (manual) tests.
+The full solution test run skips live and AOT tests when iRacing isn't running
 
 ```powershell
 dotnet test --solution .\Sdk\SVappsLAB.iRacingTelemetrySDK.slnx

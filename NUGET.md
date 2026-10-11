@@ -19,7 +19,7 @@ High-performance .NET SDK for accessing **live telemetry data** from iRacing sim
 
 Most .NET iRacing libraries are thin wrappers over the simulator's shared-memory layout — variables looked up by string name at runtime, data delivered through events on the caller's thread. This SDK treats telemetry as a **typed, high-throughput data stream** instead:
 
-- **Compile-time generated structs** instead of runtime string/dictionary lookups — typos are build errors, and only the variables you declare are ever decoded
+- **Compile-time generated structs** instead of looking variables up by string name in your code — typos are build errors, and only the variables you declare are ever decoded
 - **Non-blocking async data streams with bounded backpressure** instead of callbacks that block further frame processing until your handler returns — your processing speed never stalls data collection
 - **The same strongly-typed API for live and IBT playback** — most alternatives are live-only, or treat file playback as a separate path
 - **Built-in `System.Diagnostics.Metrics`** integration (rates, dropped records, histograms), so telemetry health plugs directly into your existing observability stack

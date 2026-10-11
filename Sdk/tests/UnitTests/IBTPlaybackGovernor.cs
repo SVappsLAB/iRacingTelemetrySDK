@@ -80,7 +80,7 @@ public class IBTPlaybackGovernor : IClassFixture<LogFixture>
         sw.Start();
         for (int i = 0; i < recsToProcess; i++)
         {
-            await g.GovernSpeed(i);
+            await g.GovernSpeed(i, TestContext.Current.CancellationToken);
         }
         sw.Stop();
 

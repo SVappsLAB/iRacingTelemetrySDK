@@ -105,7 +105,6 @@ public enum PaceFlags
     WavedAround = 0x0004,
 };
 
-[Flags]
 public enum IncidentFlags
 {
     // first byte is incident report flag
