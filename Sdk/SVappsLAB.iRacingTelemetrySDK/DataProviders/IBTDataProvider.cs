@@ -70,7 +70,8 @@ internal unsafe class IBTDataProvider : DataProviderBase, IDataProvider
         if (_logger.IsEnabled(LogLevel.Debug))
             LogIBTFileLayout();
 
-        _governor.StartPlayback();
+        // pace records at the rate they were written
+        _governor.StartPlayback(_header.tickRate);
     }
 
     // validate
@@ -162,17 +163,19 @@ internal unsafe class IBTDataProvider : DataProviderBase, IDataProvider
     // wait for iRacing to signal there is new data
     public override Task<bool> WaitForDataReady(TimeSpan _timeSpan, CancellationToken cancellationToken = default)
     {
-        return IBTDataProviderAsyncHelper.WaitForDataReady(_governor, _currentRecord, this);
+        return IBTDataProviderAsyncHelper.WaitForDataReady(_governor, _currentRecord, this, cancellationToken);
     }
 
+    // reads the next record into the buffer. returns false at end of file, when nothing was read
     internal bool ProcessNextRecord()
     {
-        CopyNewTelemetryDataToBuffer(_currentRecord);
+        if (_currentRecord >= _numRecords)
+            return false;
 
+        CopyNewTelemetryDataToBuffer(_currentRecord);
         _currentRecord++;
 
-        // return true if there is more data to process
-        return _currentRecord < _numRecords;
+        return true;
     }
 
     irsdk_diskSubHeader GetDiskSubHeader()
@@ -195,10 +198,10 @@ internal unsafe class IBTDataProvider : DataProviderBase, IDataProvider
 // Helper class to handle async operations outside unsafe context
 internal static class IBTDataProviderAsyncHelper
 {
-    public static async Task<bool> WaitForDataReady(IPlaybackGovernor governor, int currentRecord, IBTDataProvider provider)
+    public static async Task<bool> WaitForDataReady(IPlaybackGovernor governor, int currentRecord, IBTDataProvider provider, CancellationToken cancellationToken)
     {
-        // throttle playback speed
-        await governor.GovernSpeed(currentRecord).ConfigureAwait(false);
+        // wait until the record is due. the governor is the only thing pacing playback
+        await governor.GovernSpeed(currentRecord, cancellationToken).ConfigureAwait(false);
 
         // measured after the wait, so any delay in the read loop shows up as lag
         governor.RecordLag(currentRecord);

@@ -1,12 +1,12 @@
 /**
  * Copyright (C) 2024-2026 Scott Velez
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -15,38 +15,57 @@
 **/
 
 using System;
-using System.Collections.Concurrent;
-using System.Linq.Expressions;
+using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Reflection;
-using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 using SVappsLAB.iRacingTelemetrySDK.DataProviders;
 
 namespace SVappsLAB.iRacingTelemetrySDK;
 
 /// <summary>
-/// High-performance accessor for telemetry data that eliminates boxing/unboxing overhead
-/// through ref-based operations and compiled expression trees.
+/// Builds telemetry data samples of type <typeparamref name="T"/> from the data provider.
 /// </summary>
 /// <typeparam name="T">The telemetry data struct type</typeparam>
-internal sealed class TelemetryDataAccessor<T> where T : struct
+internal sealed class TelemetryDataAccessor<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)] T> where T : struct
 {
     private readonly ILogger _logger;
+    private TelemetryValueReader? _reader;
+    private readonly IGeneratedTelemetryData<T>? _generated;
     private readonly PropertyAccessor[] _propertyAccessors;
 
     public TelemetryDataAccessor(ILogger logger)
     {
         _logger = logger;
-        _propertyAccessors = CompilePropertyAccessors();
+
+        if (default(T) is IGeneratedTelemetryData<T> generated)
+        {
+            _generated = generated;
+            _propertyAccessors = [];
+        }
+        else
+        {
+            _propertyAccessors = GetPropertyAccessors();
+        }
     }
 
     /// <summary>
-    /// Creates a new telemetry data sample with high performance, avoiding boxing/unboxing
+    /// Creates a new telemetry data sample from the provider's current values
     /// </summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public T CreateTelemetryDataSample(IDataProvider dataProvider)
     {
-        var telemetryData = default(T);
+        if (_generated != null)
+        {
+            // the provider is fixed for a client's lifetime, so the reader is too
+            if (_reader?.DataProvider != dataProvider)
+            {
+                _reader = new TelemetryValueReader(dataProvider, _logger);
+            }
+            return _generated.Read(_reader);
+        }
+
+        // reflection fallback. properties are set on one boxed copy, then unboxed
+        object telemetryData = default(T);
 
         foreach (var accessor in _propertyAccessors)
         {
@@ -55,8 +74,7 @@ internal sealed class TelemetryDataAccessor<T> where T : struct
 
             try
             {
-                var convertedValue = accessor.ConvertValue(rawValue);
-                accessor.SetValue(ref telemetryData, convertedValue);
+                accessor.SetValue(telemetryData, rawValue);
             }
             catch (Exception ex)
             {
@@ -65,11 +83,10 @@ internal sealed class TelemetryDataAccessor<T> where T : struct
             }
         }
 
-        return telemetryData;
+        return (T)telemetryData;
     }
 
-
-    private static PropertyAccessor[] CompilePropertyAccessors()
+    private static PropertyAccessor[] GetPropertyAccessors()
     {
         var properties = typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance);
         var accessors = new PropertyAccessor[properties.Length];
@@ -82,110 +99,36 @@ internal sealed class TelemetryDataAccessor<T> where T : struct
         return accessors;
     }
 
-    private delegate void RefSetter<TStruct>(ref TStruct instance, object value) where TStruct : struct;
-
     private sealed class PropertyAccessor
     {
-        private static readonly ConcurrentDictionary<Type, Func<object, object>> _converterCache
-            = new ConcurrentDictionary<Type, Func<object, object>>();
+        private readonly PropertyInfo _property;
+        private readonly Type _targetType;
+        private readonly Type _underlyingType;
 
-        public string PropertyName { get; }
-        public Type PropertyType { get; }
-        public Type UnderlyingType { get; }
-        public bool IsEnum { get; }
-        public bool IsNullable { get; }
-
-        private readonly RefSetter<T> _refSetter;
-        private readonly Func<object, object> _converter;
+        public string PropertyName => _property.Name;
 
         public PropertyAccessor(PropertyInfo property)
         {
-            PropertyName = property.Name;
-            PropertyType = property.PropertyType;
-            UnderlyingType = Nullable.GetUnderlyingType(PropertyType) ?? PropertyType;
-            IsEnum = UnderlyingType.IsEnum;
-            IsNullable = PropertyType != UnderlyingType;
-
-            _refSetter = CompileRefPropertySetter(property);
-            _converter = GetOrCompileConverter(PropertyType, UnderlyingType, IsEnum);
+            _property = property;
+            _targetType = property.PropertyType;
+            _underlyingType = Nullable.GetUnderlyingType(_targetType) ?? _targetType;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void SetValue(ref T instance, object value)
+        public void SetValue(object boxedInstance, object rawValue) =>
+            _property.SetValue(boxedInstance, ConvertValue(rawValue));
+
+        private object ConvertValue(object value)
         {
-            _refSetter(ref instance, value);
-        }
+            // enums (and flags) arrive as their int value
+            if (_underlyingType.IsEnum)
+                return Enum.ToObject(_underlyingType, (int)value);
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public object ConvertValue(object value)
-        {
-            return _converter(value);
-        }
+            // arrays and object properties take the provider's value as is
+            if (_targetType.IsArray || _targetType == typeof(object))
+                return value;
 
-        private static RefSetter<T> CompileRefPropertySetter(PropertyInfo property)
-        {
-            var instanceParam = Expression.Parameter(typeof(T).MakeByRefType(), "instance");
-            var valueParam = Expression.Parameter(typeof(object), "value");
-
-            var valueCast = Expression.Convert(valueParam, property.PropertyType);
-            var propertyAccess = Expression.Property(instanceParam, property);
-            var assignment = Expression.Assign(propertyAccess, valueCast);
-
-            var lambda = Expression.Lambda<RefSetter<T>>(
-                assignment, instanceParam, valueParam);
-
-            return lambda.Compile();
-        }
-
-        private static Func<object, object> GetOrCompileConverter(Type targetType, Type underlyingType, bool isEnum)
-        {
-            return _converterCache.GetOrAdd(targetType, _ => CompileConverter(targetType, underlyingType, isEnum));
-        }
-
-        private static Func<object, object> CompileConverter(Type targetType, Type underlyingType, bool isEnum)
-        {
-            var valueParam = Expression.Parameter(typeof(object), "value");
-            Expression conversionExpr;
-
-            if (isEnum)
-            {
-                // Handle enum conversion: if value is int, convert to enum
-                var valueAsInt = Expression.Convert(valueParam, typeof(int));
-                conversionExpr = Expression.Call(
-                    typeof(Enum).GetMethod(nameof(Enum.ToObject), new[] { typeof(Type), typeof(object) })!,
-                    Expression.Constant(underlyingType),
-                    Expression.Convert(valueAsInt, typeof(object)));
-                conversionExpr = Expression.Convert(conversionExpr, targetType);
-            }
-            else if (targetType.IsArray)
-            {
-                // Handle array types: direct cast, no conversion needed
-                conversionExpr = Expression.Convert(valueParam, targetType);
-            }
-            else if (targetType == typeof(object))
-            {
-                // No conversion needed
-                conversionExpr = valueParam;
-            }
-            else if (Nullable.GetUnderlyingType(targetType) != null)
-            {
-                // Handle nullable types: convert to underlying type first, then to nullable
-                var underlyingConvertMethod = typeof(Convert).GetMethod(nameof(Convert.ChangeType), new[] { typeof(object), typeof(Type) });
-                var underlyingConversion = Expression.Call(underlyingConvertMethod!, valueParam, Expression.Constant(underlyingType));
-                conversionExpr = Expression.Convert(underlyingConversion, targetType);
-            }
-            else
-            {
-                // Standard type conversion
-                var convertMethod = typeof(Convert).GetMethod(nameof(Convert.ChangeType), new[] { typeof(object), typeof(Type) });
-                conversionExpr = Expression.Call(convertMethod!, valueParam, Expression.Constant(targetType));
-                conversionExpr = Expression.Convert(conversionExpr, targetType);
-            }
-
-            var lambda = Expression.Lambda<Func<object, object>>(
-                Expression.Convert(conversionExpr, typeof(object)), valueParam);
-
-            return lambda.Compile();
+            // nullable types box as their underlying value, so converting to that is enough
+            return Convert.ChangeType(value, _underlyingType, CultureInfo.InvariantCulture);
         }
     }
 }

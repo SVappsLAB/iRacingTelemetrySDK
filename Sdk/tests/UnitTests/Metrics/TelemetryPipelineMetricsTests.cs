@@ -248,7 +248,8 @@ public class TelemetryPipelineMetricsTests
 
         await client.Monitor(new TelemetryHandlers<PipelineTelemetryData>
         {
-            OnTelemetryUpdate = _ => Task.CompletedTask
+            OnTelemetryUpdate = _ => Task.CompletedTask,
+            OnSessionInfoUpdate = _ => Task.CompletedTask
         }, TestContext.Current.CancellationToken);
 
         var processed = collector.Sum(MetricNames.SessionInfoRecordsProcessed);
@@ -261,6 +262,29 @@ public class TelemetryPipelineMetricsTests
         Assert.True(collector.Median(MetricNames.SessionInfoSize) > 1024,
             $"session info size looks wrong: {collector.Median(MetricNames.SessionInfoSize)} bytes");
         Assert.InRange(collector.Median(MetricNames.SessionInfoParseAttempts), 1, 2);
+    }
+
+    [Fact]
+    public async Task SessionInfo_NotParsedWhenOnlyRawYamlIsHandled()
+    {
+        using var factory = new TestMeterFactory();
+        await using var client = CreateClient(factory);
+        using var collector = new Collector(factory);
+
+        var rawUpdates = 0;
+        await client.Monitor(new TelemetryHandlers<PipelineTelemetryData>
+        {
+            OnTelemetryUpdate = _ => Task.CompletedTask,
+            OnRawSessionInfoUpdate = _ =>
+            {
+                Interlocked.Increment(ref rawUpdates);
+                return Task.CompletedTask;
+            }
+        }, TestContext.Current.CancellationToken);
+
+        Assert.True(rawUpdates > 0, "the raw session info yaml was not delivered");
+        Assert.Equal(0, collector.Sum(MetricNames.SessionInfoRecordsProcessed));
+        Assert.Equal(0, collector.Count(MetricNames.SessionInfoParseAttempts));
     }
 
     [Fact]

@@ -62,9 +62,9 @@ This SDK takes a different approach. It treats telemetry as a **typed, high-thro
 
 **Why it's fast:**
 
-- **Source-generated structs** eliminate runtime reflection and string lookups from the hot path — only the variables you asked for are ever decoded
+- **Source-generated structs** eliminate runtime reflection from the hot path — only the variables you asked for are ever decoded
 - **Lock-free bounded streams** keep telemetry current under load instead of queueing unboundedly behind a slow consumer
-- **Minimal-allocation reads** — each sample is copied once into a reused buffer (guarding against iRacing overwriting it mid-read), then decoded field-by-field via `ReadOnlySpan<T>` with no further allocations, keeping steady-state GC pressure near zero
+- **Low-allocation reads** — each sample is copied once into a reused buffer (guarding against iRacing overwriting it mid-read), then only the requested variables are decoded, so per-sample allocation is limited to those values (a boxed scalar or a copied array each)
 - **Independent background tasks** mean CPU-intensive session-info YAML parsing never stalls the 60Hz telemetry path
 
 Full details on the threading model and buffering semantics: **[Architecture and Design](./docs/ARCHITECTURE.md)**. For the built-in metrics and how to collect them: **[Metrics and Diagnostics](./docs/METRICS.md)**

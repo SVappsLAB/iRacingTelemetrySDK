@@ -30,7 +30,7 @@ public class Live : Base<Live>
         Assert.SkipUnless(IsIRacingConnected(), "iRacing is not running with an active session");
     }
 
-    static bool IsIRacingConnected()
+    internal static bool IsIRacingConnected()
     {
         const int STATUS_OFFSET = 4;    // irsdk_header.status follows the int 'ver' field
         const int STATUS_CONNECTED = 1;

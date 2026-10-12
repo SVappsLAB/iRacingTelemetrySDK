@@ -20,6 +20,7 @@ using SVappsLAB.iRacingTelemetrySDK.Metrics;
 using SVappsLAB.iRacingTelemetrySDK.SimControl;
 using SVappsLAB.iRacingTelemetrySDK.YamlParsing;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics.Metrics;
 using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
@@ -75,8 +76,10 @@ public record class TelemetryVariable
 /// }, cancellationToken);
 /// </code>
 /// </remarks>
-public readonly struct DynamicTelemetryData
+public readonly struct DynamicTelemetryData : IGeneratedTelemetryData<DynamicTelemetryData>
 {
+    // carries no values, so there's nothing to read
+    DynamicTelemetryData IGeneratedTelemetryData<DynamicTelemetryData>.Read(TelemetryValueReader reader) => default;
 }
 
 /**
@@ -119,7 +122,7 @@ public enum TelemetryDeliveryMode
     Async,
 
     /// <summary>
-    /// This is the slower, blocking, optional sychronous mode. 
+    /// This is the slower, blocking, optional sychronous mode.
     /// Only supported via
     /// <see cref="TelemetryClient{T}.Monitor(TelemetryHandlers{T}, CancellationToken)"/> with
     /// <see cref="TelemetryHandlers{T}.OnTelemetryUpdate"/> set - both <c>Monitor(CancellationToken)</c>
@@ -151,7 +154,8 @@ public class ClientOptions
     public IMeterFactory? MeterFactory { get; init; }
 }
 
-public class TelemetryClient<T> : ITelemetryClient<T>, IAsyncDisposable where T : struct
+// annotation on T keeps the public properties from being trimmed
+public class TelemetryClient<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)] T> : ITelemetryClient<T>, IAsyncDisposable where T : struct
 {
     const int DATA_READY_TIMEOUT_MS = 30;
     const int INITIALIZATION_DELAY_MS = 1000;
@@ -174,6 +178,9 @@ public class TelemetryClient<T> : ITelemetryClient<T>, IAsyncDisposable where T 
     private ILogger _logger;
 
     private volatile bool _isInitialized = false;
+
+    // typed session info is parsed only when OnSessionInfoUpdate handler is active
+    private volatile bool _parseSessionInfo = true;
     private volatile bool _isPaused = false;
     private bool _lastConnectionStatus = false;
 
@@ -214,7 +221,14 @@ public class TelemetryClient<T> : ITelemetryClient<T>, IAsyncDisposable where T 
     public IAsyncEnumerable<string> SessionDataYaml => GetRawSessionDataEnumerable();
 
     /// <inheritdoc />
-    public IAsyncEnumerable<TelemetrySessionInfo> SessionData => GetSessionDataEnumerable();
+    public IAsyncEnumerable<TelemetrySessionInfo> SessionData
+    {
+        get
+        {
+            _parseSessionInfo = true;
+            return GetSessionDataEnumerable();
+        }
+    }
 
     /// <inheritdoc />
     public IAsyncEnumerable<T> TelemetryData =>
@@ -403,6 +417,8 @@ public class TelemetryClient<T> : ITelemetryClient<T>, IAsyncDisposable where T 
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
 
         BeginMonitor();
+
+        _parseSessionInfo = handlers.OnSessionInfoUpdate != null;
 
         var subscriptionTask = SubscribeToHandlers(handlers, linkedCts);
         var monitorTask = RunMonitor(linkedCts.Token);
@@ -889,6 +905,11 @@ public class TelemetryClient<T> : ITelemetryClient<T>, IAsyncDisposable where T 
                 {
                     _rawSessionDataChannel.Writer.TryWrite(rawYaml);
 
+                    if (!_parseSessionInfo)
+                    {
+                        continue;
+                    }
+
                     var sessionInfo = ParseSessionInfo(rawYaml);
                     if (sessionInfo != null)
                     {
@@ -1150,11 +1171,8 @@ public class TelemetryClient<T> : ITelemetryClient<T>, IAsyncDisposable where T 
                 }
             }
 
-            // Process with respect for playback speed multiplier
-            var playbackDelay = _ibtOptions?.PlayBackSpeedMultiplier == int.MaxValue ? TimeSpan.Zero :
-                TimeSpan.FromMilliseconds(16.67 / (_ibtOptions?.PlayBackSpeedMultiplier ?? 1)); // ~60 FPS base rate
-
-            // loop until we are at eof, cancelled, or shutdown requested
+            // loop until we are at eof, cancelled, or shutdown requested. WaitForDataReady
+            // paces the records to the requested playback speed
             for (numRecords = 0; !token.IsCancellationRequested; numRecords++)
             {
                 var dataAvailable = await _dataProvider.WaitForDataReady(TimeSpan.Zero, token).ConfigureAwait(false);
@@ -1172,12 +1190,6 @@ public class TelemetryClient<T> : ITelemetryClient<T>, IAsyncDisposable where T 
                     await DeliverTelemetryData(new(GetTelemetryDataSample(), acquiredTimestamp)).ConfigureAwait(false);
                 }
 
-                // Apply playback speed delay if configured
-                if (playbackDelay > TimeSpan.Zero)
-                {
-                    await Task.Delay(playbackDelay, token).ConfigureAwait(false);
-                }
-
                 // Yield periodically for responsive cancellation
                 if (numRecords % 100 == 0)
                 {
@@ -1187,7 +1199,7 @@ public class TelemetryClient<T> : ITelemetryClient<T>, IAsyncDisposable where T 
             }
 
             sw.Stop();
-            var recsPerSec = Math.Round(numRecords / (sw.ElapsedMilliseconds + 1) * 1000f, 1); // +1 to avoid division by zero
+            var recsPerSec = Math.Round(numRecords * 1000d / (sw.ElapsedMilliseconds + 1), 1); // +1 to avoid division by zero
             var minsOfData = Math.Round(numRecords / 60f / 60f, 2);
             _logger.LogInformation("processed {numRecords} IBT telemetry records ({minsOfData} mins worth of session data), in {milliseconds}ms. ({rate} recs/sec)", numRecords, minsOfData, sw.ElapsedMilliseconds, recsPerSec);
         }
